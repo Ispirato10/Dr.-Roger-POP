@@ -47,56 +47,66 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   if (!user) return <>{children}</>;
 
   return (
-    <div className="min-h-screen bg-[#f1f5f9] flex flex-col h-screen overflow-hidden">
+    <div className="min-h-screen bg-slate-50 flex flex-col h-screen overflow-hidden">
       {/* Header */}
-      <header className="h-16 bg-[#0f172a] text-white flex items-center justify-between px-6 border-b-4 border-[#3b82f6] shrink-0 z-50">
+      <header className="h-16 bg-white border-b border-slate-100 shrink-0 z-50 flex items-center justify-between px-6">
         <div className="flex items-center space-x-3">
           <div className="md:hidden mr-2">
-            <button onClick={() => setIsMenuOpen(!isMenuOpen)}>
+            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 hover:bg-slate-50 rounded-xl transition-colors">
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
-          <div className="hidden md:flex items-center space-x-3">
-            <div className="w-8 h-8 bg-[#2563eb] rounded-md flex items-center justify-center font-bold text-xl">R</div>
-            <div className="flex flex-col">
-              <span className="text-lg font-bold tracking-tight leading-none uppercase">Dr. Roger POP</span>
-              <span className="text-[10px] opacity-70 font-semibold tracking-wider">SISTEMA DE GESTÃO FARMACÊUTICA</span>
+          <div className="flex items-center space-x-4 cursor-pointer group" onClick={() => navigate('/')}>
+            <div className="w-11 h-11 relative">
+              <div className="absolute inset-0 bg-blue-600 blur-lg opacity-20 group-hover:opacity-40 transition-opacity"></div>
+              <img src="/logorogerpop.png" alt="Logo" className="w-full h-full object-contain relative z-10 drop-shadow-md group-hover:scale-105 transition-transform" />
+            </div>
+            <div className="hidden sm:flex flex-col">
+              <span className="text-xl font-black tracking-tighter leading-none text-blue-600">DR. ROGER <span className="text-slate-900 font-black">POP</span></span>
+              <span className="text-[10px] text-slate-400 font-black tracking-[0.2em] uppercase mt-1">Sistemas de Qualidade</span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center space-x-5">
-          <div className="hidden sm:block text-right">
-            <div className="text-[13px] font-semibold leading-none">{drugstore?.name || 'Farmácia'}</div>
-            <div className="text-[11px] opacity-70 mt-0.5 leading-none">CRF: {drugstore?.crf || '-'}</div>
+        <div className="flex items-center space-x-4">
+          <div className="hidden sm:block text-right mr-2">
+            <div className="text-sm font-black text-slate-900 leading-none uppercase tracking-tight">{drugstore?.name || 'Drogaria'}</div>
+            <div className="text-[10px] text-slate-400 font-bold mt-1.5 leading-none tracking-[0.1em] uppercase">CRF: {drugstore?.crf || '-'}</div>
           </div>
-          <div className="w-8 h-8 rounded-full bg-[#334155] border border-[#475569] flex items-center justify-center text-xs font-bold">
-            {user.email?.[0].toUpperCase()}
+          
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-100 shadow-sm flex items-center justify-center text-sm font-black text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all cursor-pointer">
+              {user.email?.[0].toUpperCase()}
+            </div>
           </div>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden relative">
         {/* Sidebar */}
-        <aside className={sidebarClasses}>
+        <aside className={`
+          fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-slate-100 p-6 flex flex-col gap-6 transform transition-transform duration-300 md:relative md:translate-x-0
+          ${isMenuOpen ? 'translate-x-0 pt-24' : '-translate-x-full'}
+        `}>
           <div className="flex-1 overflow-y-auto px-1 py-1 custom-scrollbar">
-            <nav className="flex flex-col space-y-1">
+            <nav className="flex flex-col space-y-1.5">
+              <div className="text-[10px] font-black text-slate-400 uppercase mb-4 px-4 tracking-widest leading-none">Menu Principal</div>
               {navItems.map((item) => (
                 <Link
                   key={item.path}
                   to={item.path}
                   onClick={() => setIsMenuOpen(false)}
-                  className={`nav-item ${location.pathname === item.path ? 'nav-item-active' : ''}`}
+                  className={`nav-item flex items-center gap-4 ${location.pathname === item.path ? 'nav-item-active' : ''}`}
                 >
-                  <item.icon size={18} />
-                  <span className="text-sm">{item.name}</span>
+                  <item.icon size={18} className={location.pathname === item.path ? 'text-blue-600' : 'text-slate-400'} />
+                  <span className="text-sm tracking-tight">{item.name}</span>
                 </Link>
               ))}
             </nav>
 
-            <div className="mt-6">
-              <div className="text-[11px] font-bold text-[#94a3b8] uppercase mb-3 px-3 tracking-wider">Categorias Rápidas</div>
-              <div className="flex flex-col space-y-0.5">
+            <div className="mt-8">
+              <div className="text-[10px] font-black text-slate-400 uppercase mb-4 px-4 tracking-widest leading-none">Categorias Rápidas</div>
+              <div className="flex flex-col space-y-1">
                 {[
                   'Assistência',
                   'Controlados',
@@ -109,44 +119,44 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                     key={cat}
                     to={`/pops?q=${encodeURIComponent(cat)}`} 
                     onClick={() => setIsMenuOpen(false)}
-                    className="px-3 py-1.5 text-sm text-[#475569] hover:text-[#2563eb] transition-colors flex items-center"
+                    className="px-4 py-2 text-sm text-slate-500 font-bold hover:text-blue-600 hover:translate-x-1 transition-all flex items-center"
                   >
-                    <span className="mr-2 opacity-50">•</span> {cat}
+                    <span className="mr-3 text-[8px] text-slate-300">•</span> {cat}
                   </Link>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="pt-4 border-t border-[#f1f5f9] shrink-0 space-y-3">
+          <div className="pt-6 border-t border-slate-50 shrink-0 space-y-4">
             <button
               onClick={() => {
                 const text = encodeURIComponent("Acesse o Dr. Roger POP - Sistema de Gestão Farmacêutica: https://dr-roger-pop.vercel.app");
                 window.open(`https://wa.me/?text=${text}`, '_blank');
               }}
-              className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-all text-sm font-bold shadow-sm"
+              className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl transition-all text-xs font-black shadow-lg shadow-emerald-500/20 active:scale-95"
             >
               <Share2 size={16} />
-              <span>Compartilhar Web App</span>
+              <span>INDICAR SISTEMA</span>
             </button>
 
             <button
               onClick={handleSignOut}
-              className="w-full flex items-center space-x-3 px-3 py-2.5 text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-md transition-all text-sm font-medium"
+              className="w-full flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-red-50 hover:text-red-600 rounded-2xl transition-all text-sm font-bold group"
             >
-              <LogOut size={18} />
+              <LogOut size={18} className="group-hover:-translate-x-1 transition-transform" />
               <span>Sair do Sistema</span>
             </button>
           </div>
         </aside>
 
-        <main className="flex-1 p-6 md:p-8 overflow-auto">
+        <main className="flex-1 p-6 md:p-10 overflow-auto custom-scrollbar">
           <motion.div
             key={location.pathname}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.2 }}
-            className="max-w-6xl mx-auto"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="max-w-7xl mx-auto"
           >
             {children}
           </motion.div>

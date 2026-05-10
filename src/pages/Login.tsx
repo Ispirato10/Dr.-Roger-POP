@@ -23,24 +23,37 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-sky-50 p-4">
-      <div className="card max-w-md w-full text-center space-y-8 py-12 px-8">
-        <div className="space-y-4">
-          <div className="mx-auto w-16 h-16 bg-sky-100 rounded-2xl flex items-center justify-center text-sky-600">
-            <ShieldCheck size={40} />
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600 blur-[120px] rounded-full"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-600 blur-[120px] rounded-full"></div>
+      </div>
+
+      <div className="card max-w-md w-full text-center space-y-10 py-16 px-10 relative z-10 border-none shadow-2xl shadow-slate-200">
+        <div className="space-y-6">
+          <div className="mx-auto w-32 h-32 relative group">
+            <img 
+              src="/logorogerpop.png" 
+              alt="Dr. Roger POP Logo" 
+              className="w-full h-full object-contain drop-shadow-xl group-hover:scale-110 transition-transform duration-500"
+              referrerPolicy="no-referrer"
+            />
           </div>
-          <h1 className="text-3xl font-bold text-slate-800">Dr. Roger POP</h1>
-          <p className="text-slate-500">
-            Gestão simplificada de Procedimentos Operacionais Padrão para sua farmácia.
+          <div className="space-y-2">
+            <h1 className="text-4xl font-black tracking-tight text-slate-900 leading-none uppercase">DR. ROGER <span className="text-blue-600">POP</span></h1>
+            <p className="text-xs font-black text-slate-400 tracking-[0.2em] uppercase">Compliance Farmacêutica Profissional</p>
+          </div>
+          <p className="text-sm text-slate-500 font-medium leading-relaxed px-4">
+            Gestão normativa simplificada de Procedimentos Operacionais Padrão sob medida para sua drogaria.
           </p>
         </div>
 
         <button
           onClick={handleLogin}
-          className="w-full flex items-center justify-center space-x-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium py-3 px-6 rounded-xl transition-all shadow-sm active:scale-95"
+          className="w-full flex items-center justify-center space-x-4 bg-white border border-slate-100 hover:bg-slate-50 text-slate-900 font-black py-4 px-8 rounded-2xl transition-all shadow-md active:scale-95 group"
         >
-          <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-          <span>Entrar com Google</span>
+          <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+          <span className="uppercase tracking-widest text-xs">Entrar com Google</span>
         </button>
 
         {error && (

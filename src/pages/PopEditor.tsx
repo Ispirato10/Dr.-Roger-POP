@@ -13,6 +13,8 @@ import {
   FileText,
   Search,
   Trash2,
+  Edit,
+  Clock,
   History, 
   ShieldCheck, 
   Loader2,
@@ -143,19 +145,28 @@ export default function PopEditor() {
         new TableRow({
           children: [
             new TableCell({
-              children: logoImageRun ? [new Paragraph({ children: [logoImageRun], alignment: AlignmentType.CENTER })] : [new Paragraph({ text: drugstore?.name || "LOGO", alignment: AlignmentType.CENTER })],
+              children: logoImageRun ? [new Paragraph({ children: [logoImageRun], alignment: AlignmentType.CENTER })] : [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "DR. ROGER ", bold: true, size: 24, color: "3b82f6" }),
+                    new TextRun({ text: "POP", bold: true, size: 24, color: "0f172a" }),
+                  ],
+                  alignment: AlignmentType.CENTER,
+                })
+              ],
               width: { size: 25, type: WidthType.PERCENTAGE },
               verticalAlign: VerticalAlign.CENTER,
+              shading: { fill: "F8FAFC" },
             }),
             new TableCell({
               children: [
                 new Paragraph({
-                  text: "PROCEDIMENTO OPERACIONAL PADRÃO (POP)",
+                  text: "PROCEDIMENTO OPERACIONAL PADRÃO",
                   heading: HeadingLevel.HEADING_2,
                   alignment: AlignmentType.CENTER,
                 }),
                 new Paragraph({
-                  text: currentValues.title?.toUpperCase() || "SEM TÍTULO",
+                  children: [new TextRun({ text: currentValues.title?.toUpperCase() || "SEM TÍTULO", bold: true, size: 28 })],
                   alignment: AlignmentType.CENTER,
                   spacing: { before: 100 },
                 }),
@@ -165,12 +176,13 @@ export default function PopEditor() {
             }),
             new TableCell({
               children: [
-                new Paragraph({ children: [new TextRun({ text: `CÓDIGO: ${currentValues.code || "-"}`, size: 16 })] }),
-                new Paragraph({ children: [new TextRun({ text: `VERSÃO: ${currentValues.version}.0`, size: 16 })] }),
-                new Paragraph({ children: [new TextRun({ text: `DATA: ${format(new Date(), "dd/MM/yyyy")}`, size: 16 })] }),
+                new Paragraph({ children: [new TextRun({ text: `CÓDIGO:`, bold: true, size: 16 }), new TextRun({ text: ` ${currentValues.code || "-"}` , size: 16})] }),
+                new Paragraph({ children: [new TextRun({ text: `VERSÃO:`, bold: true, size: 16 }), new TextRun({ text: ` ${currentValues.version}.0` , size: 16})] }),
+                new Paragraph({ children: [new TextRun({ text: `DATA:`, bold: true, size: 16 }), new TextRun({ text: ` ${format(new Date(), "dd/MM/yyyy")}` , size: 16})] }),
               ],
               width: { size: 25, type: WidthType.PERCENTAGE },
               verticalAlign: VerticalAlign.CENTER,
+              shading: { fill: "F8FAFC" },
             }),
           ],
         }),
@@ -200,11 +212,18 @@ export default function PopEditor() {
         spacing: { before: 300, after: 100 },
         shading: { fill: "F2F2F2" },
       }));
-      children.push(new Paragraph({
-        text: section.value || "-",
-        spacing: { after: 200 },
-        alignment: AlignmentType.LEFT,
-      }));
+
+      // Split text into lines to handle paragraphs correctly in DOCX
+      const lines = (section.value || "-").split('\n');
+      lines.forEach(line => {
+        if (line.trim() || line === "") {
+          children.push(new Paragraph({
+            text: line,
+            spacing: { after: 100 },
+            alignment: AlignmentType.LEFT,
+          }));
+        }
+      });
     });
 
     // Add Custom Fields to DOCX
@@ -632,82 +651,67 @@ export default function PopEditor() {
     t.category.toLowerCase().includes(templateSearch.toLowerCase())
   );
 
-  if (loading) return <div className="py-20 text-center">Carregando POP...</div>;
+  if (loading) return <div className="py-20 text-center font-bold text-slate-400 uppercase tracking-widest animate-pulse">Carregando POP...</div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2 border-b border-slate-100">
-        <div className="flex items-center gap-4">
+    <div className="space-y-10 px-1 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-100">
+        <div className="flex items-center gap-5">
           <div className="relative">
-            <div className="p-3 bg-gradient-to-br from-sky-600 to-sky-800 text-white rounded-xl shadow-lg border border-white/20">
-              <ShieldCheck size={28} className="drop-shadow-md" />
+            <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl shadow-xl shadow-blue-500/20 flex items-center justify-center border border-white/20">
+              <ShieldCheck size={32} className="drop-shadow-md" />
             </div>
-            <div className="absolute -bottom-1 -right-1 bg-white p-1 rounded-full shadow-sm border border-slate-100">
-              <FileText size={12} className="text-sky-600" />
+            <div className="absolute -bottom-1 -right-1 bg-white p-1.5 rounded-full shadow-md border border-slate-50">
+              <FileText size={14} className="text-blue-600" />
             </div>
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-              Editor Profissional de POP
-              <span className="text-[10px] bg-sky-100 text-sky-700 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Normativo</span>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+              Editor de POP
+              <span className="text-[10px] bg-blue-50 text-blue-600 font-black px-2.5 py-1 rounded-full uppercase tracking-widest border border-blue-100">Profissional</span>
             </h1>
-            <p className="text-sm text-slate-500">Gestão de qualificação e conformidade farmacêutica.</p>
+            <p className="text-sm text-slate-400 font-bold tracking-tight uppercase mt-0.5">Gestão de qualificação e conformidade técnica</p>
           </div>
         </div>
         
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/pops')} className="flex items-center text-slate-500 hover:text-slate-800 transition-colors text-sm font-medium">
-            <ArrowLeft size={18} className="mr-2" />
-            Voltar
+          <button onClick={() => navigate('/pops')} className="flex items-center text-slate-500 hover:text-slate-900 transition-colors text-sm font-bold tracking-tight group">
+            <ArrowLeft size={18} className="mr-2 group-hover:-translate-x-1 transition-transform" />
+            Voltar à Biblioteca
           </button>
           
-          <div className="h-8 w-px bg-slate-200 hidden md:block"></div>
-         <div className="flex space-x-3">
-          {id && (
-            <>
-              <button 
-                type="button"
-                onClick={deletePop}
-                disabled={deleting}
-                className={`flex items-center space-x-2 border px-4 py-2 rounded-lg transition-all disabled:opacity-50 cursor-pointer shadow-sm ${
-                  confirmDelete 
-                    ? 'bg-red-600 text-white border-red-700 font-bold' 
-                    : 'text-red-600 bg-red-50 border-red-100 hover:bg-red-100'
-                }`}
-                title={confirmDelete ? "Clique novamente para confirmar a exclusão permanente" : "Excluir documento permanentemente"}
-              >
-                {deleting ? (
-                  <Loader2 className="animate-spin" size={18} />
-                ) : confirmDelete ? (
-                  <span className="uppercase text-xs tracking-wider">Confirmar Exclusão?</span>
-                ) : (
-                  <Trash2 size={18} />
-                )}
-                {!confirmDelete && <span>{deleting ? 'Excluindo...' : 'Excluir'}</span>}
-              </button>
-              <button onClick={generatePDF} className="flex items-center space-x-2 text-slate-600 bg-white border border-slate-200 px-4 py-2 rounded-lg hover:bg-slate-50">
-                <FileDown size={18} />
-                <span>PDF</span>
-              </button>
-              <button onClick={generateDOCX} className="flex items-center space-x-2 text-slate-600 bg-white border border-slate-200 px-4 py-2 rounded-lg hover:bg-slate-50">
-                <FileText size={18} />
-                <span>DOCX</span>
-              </button>
-            </>
-          )}
-          <button 
-            disabled={saving}
-            onClick={handleSubmit(onSubmit)}
-            className="btn-primary flex items-center space-x-2"
-          >
-            {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-            <span>{saving ? 'Salvando...' : 'Salvar POP'}</span>
-          </button>
+          <div className="h-8 w-px bg-slate-100 hidden md:block mx-2"></div>
+          <div className="flex items-center gap-2">
+            {id && (
+              <div className="flex items-center gap-2 mr-2">
+                <button 
+                  onClick={generatePDF} 
+                  className="w-10 h-10 flex items-center justify-center text-slate-600 bg-white border border-slate-100 rounded-xl hover:bg-red-50 hover:text-red-600 transition-all shadow-sm group"
+                  title="Exportar PDF"
+                >
+                  <FileDown size={18} className="group-hover:translate-y-0.5 transition-transform" />
+                </button>
+                <button 
+                  onClick={generateDOCX} 
+                  className="w-10 h-10 flex items-center justify-center text-slate-600 bg-white border border-slate-100 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-all shadow-sm group"
+                  title="Exportar DOCX"
+                >
+                  <FileText size={18} className="group-hover:translate-y-0.5 transition-transform" />
+                </button>
+              </div>
+            )}
+            <button 
+              disabled={saving}
+              onClick={handleSubmit(onSubmit)}
+              className="btn-primary flex items-center gap-3 min-w-[140px] justify-center"
+            >
+              {saving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+              <span className="uppercase tracking-widest text-xs font-black">{saving ? 'Salvando...' : 'Salvar POP'}</span>
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-
-    {showTemplates && (
+      {showTemplates && (
         <div className="card bg-sky-50 border-sky-200">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
             <h3 className="font-bold text-sky-800 flex items-center gap-2 min-w-[200px]">
@@ -748,76 +752,101 @@ export default function PopEditor() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="card space-y-6">
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2 space-y-1">
-                  <label className="text-xs font-bold uppercase text-slate-400">Título do Procedimento</label>
-                  <input {...register('title')} className="input-field" placeholder="Ex: Dispensação de Psicotrópicos" />
-                  {errors.title && <p className="text-xs text-red-500">{errors.title.message}</p>}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        <div className="lg:col-span-8 space-y-8">
+          <div className="card shadow-xl shadow-slate-200/50 border-none p-10 space-y-10 bg-white">
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="md:col-span-2 space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Título do Procedimento</label>
+                  <input {...register('title')} className="input-field bg-slate-50 border-transparent focus:bg-white text-lg font-black tracking-tight" placeholder="Ex: Dispensação de Psicotrópicos" />
+                  {errors.title && <p className="text-xs text-red-500 font-bold">{errors.title.message}</p>}
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase text-slate-400">Código</label>
-                  <input {...register('code')} className="input-field" placeholder="POP-ADM-01" />
-                  {errors.code && <p className="text-xs text-red-500">{errors.code.message}</p>}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Código Identificador</label>
+                  <input {...register('code')} className="input-field bg-slate-50 border-transparent focus:bg-white font-mono font-bold" placeholder="POP-ADM-01" />
+                  {errors.code && <p className="text-xs text-red-500 font-bold">{errors.code.message}</p>}
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
-                  <BookOpen size={14} /> Objetivo
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none flex items-center gap-2">
+                  <BookOpen size={14} className="text-blue-500" /> Objetivo do Processo
                 </label>
-                <textarea {...register('objective')} rows={3} className="input-field" placeholder="Descreva a finalidade deste POP..." />
-                {errors.objective && <p className="text-xs text-red-500">{errors.objective.message}</p>}
+                <textarea {...register('objective')} rows={3} className="input-field bg-slate-50 border-transparent focus:bg-white resize-none" placeholder="Descreva de forma clara e objetiva a finalidade deste procedimento..." />
+                {errors.objective && <p className="text-xs text-red-500 font-bold">{errors.objective.message}</p>}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase text-slate-400">Campo de Aplicação</label>
-                  <input {...register('applicationField')} className="input-field" placeholder="Ex: Setor de dispensação" />
-                  {errors.applicationField && <p className="text-xs text-red-500">{errors.applicationField.message}</p>}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Campo de Aplicação</label>
+                  <input {...register('applicationField')} className="input-field bg-slate-50 border-transparent focus:bg-white" placeholder="Ex: Setor de dispensação, recepção..." />
+                  {errors.applicationField && <p className="text-xs text-red-500 font-bold">{errors.applicationField.message}</p>}
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase text-slate-400">Freq. de Revisão</label>
-                  <input {...register('reviewFrequency')} className="input-field" placeholder="Ex: Anual" />
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Frequência de Revisão</label>
+                  <select {...register('reviewFrequency')} className="input-field bg-slate-50 border-transparent focus:bg-white appearance-none cursor-pointer">
+                    <option value="Anual">Anual</option>
+                    <option value="Semestral">Semestral</option>
+                    <option value="Mensal">Mensal</option>
+                    <option value="Sempre que necessário">Sempre que necessário</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold uppercase text-slate-400">Definições e Siglas</label>
-                <textarea {...register('definitions')} rows={2} className="input-field" placeholder="Termos técnicos utilizados..." />
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Definições e Termos Técnicos</label>
+                <textarea {...register('definitions')} rows={2} className="input-field bg-slate-50 border-transparent focus:bg-white resize-none" placeholder="Explique siglas e termos técnicos utilizados no documento..." />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
-                    <User size={14} /> Responsável
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none flex items-center gap-2">
+                    <User size={14} className="text-blue-500" /> Responsável pela Execução
                   </label>
-                  <input {...register('responsible')} className="input-field" placeholder="Ex: Farmacêutico" />
-                  {errors.responsible && <p className="text-xs text-red-500">{errors.responsible.message}</p>}
+                  <input {...register('responsible')} className="input-field bg-slate-50 border-transparent focus:bg-white" placeholder="Ex: Farmacêutico RT, Auxiliar..." />
+                  {errors.responsible && <p className="text-xs text-red-500 font-bold">{errors.responsible.message}</p>}
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
-                    <ShieldCheck size={14} /> Equipamentos de Proteção (EPI)
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none flex items-center gap-2">
+                    <Package size={14} className="text-blue-500" /> Insumos e Materiais
                   </label>
-                  <input {...register('epi')} className="input-field" placeholder="Ex: Avental, luvas, máscara..." />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
-                    <History size={14} /> Riscos da Atividade
-                  </label>
-                  <input {...register('riscos')} className="input-field" placeholder="Ex: Contaminação cruzada, queda..." />
+                  <input {...register('materials')} className="input-field bg-slate-50 border-transparent focus:bg-white" placeholder="Ex: Computador, impressora, carimbo..." />
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
-                  <AlignJustify size={14} /> Procedimento (Passo a Passo)
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none flex items-center gap-2">
+                    <ShieldCheck size={14} className="text-blue-500" /> Equipamentos de Proteção (EPI)
+                  </label>
+                  <input {...register('epi')} className="input-field bg-slate-50 border-transparent focus:bg-white" placeholder="Ex: Avental, luvas, máscara..." />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none flex items-center gap-2">
+                    <History size={14} className="text-blue-500" /> Riscos da Atividade
+                  </label>
+                  <input {...register('riscos')} className="input-field bg-slate-50 border-transparent focus:bg-white" placeholder="Ex: Contaminação, queda, erro jurídico..." />
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-6 border-t border-slate-50">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none flex items-center gap-2">
+                  <AlignJustify size={14} className="text-blue-500" /> Procedimento Detalhado (Passo a Passo)
                 </label>
-                <textarea {...register('procedure')} rows={20} className="input-field font-sans text-sm leading-relaxed text-left" placeholder="1. Inicie o processo...\n2. Verifique..." />
-                {errors.procedure && <p className="text-xs text-red-500">{errors.procedure.message}</p>}
+                <div className="relative group">
+                  <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Alinhamento à Esquerda</span>
+                  </div>
+                  <textarea 
+                    {...register('procedure')} 
+                    rows={20} 
+                    className="input-field bg-slate-50 border-transparent focus:bg-white font-sans text-sm leading-relaxed text-left min-h-[500px]" 
+                    placeholder="Enumere os passos de execução deste procedimento..." 
+                    style={{ textAlign: 'left' }}
+                  />
+                </div>
+                {errors.procedure && <p className="text-xs text-red-500 font-bold">{errors.procedure.message}</p>}
               </div>
 
               {/* Custom Fields Section */}
@@ -930,58 +959,72 @@ export default function PopEditor() {
           </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="card space-y-4">
-            <h3 className="font-bold text-slate-800 border-b border-slate-100 pb-2">Status e Controle</h3>
+        <div className="lg:col-span-4 space-y-8">
+          <div className="card shadow-xl shadow-slate-200/50 border-none p-8 space-y-6 bg-white">
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-4">Status e Controle</h3>
             
-            <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-400">Status do Documento</label>
-              <select {...register('status')} className="input-field bg-white">
-                <option value="draft">Rascunho</option>
-                <option value="active">Ativo / Aprovado</option>
-                <option value="archived">Arquivado</option>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Estado do Documento</label>
+              <select {...register('status')} className="input-field bg-slate-50 border-transparent focus:bg-white appearance-none cursor-pointer font-bold text-sm">
+                <option value="draft">Rascunho Técnico</option>
+                <option value="active">Publicado / Ativo</option>
+                <option value="archived">Arquivo Morto</option>
               </select>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-400">Versão</label>
-              <div className="flex items-center space-x-2">
-                <div className="input-field bg-slate-50 flex-1">{currentValues.version}.0</div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Versão Atual</label>
+              <div className="flex items-center gap-3">
+                <div className="input-field bg-slate-100 border-transparent flex-1 font-mono font-black text-slate-500">v{currentValues.version}.0</div>
                 {id && (
                   <button 
                     type="button"
                     onClick={() => setValue('version', (currentValues.version || 1) + 1)}
-                    className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50"
+                    className="w-11 h-11 flex items-center justify-center bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm group"
                     title="Incrementar versão"
                   >
-                    <History size={18} />
+                    <History size={18} className="group-hover:rotate-180 transition-transform duration-500" />
                   </button>
                 )}
               </div>
             </div>
 
             {currentValues.status === 'active' && (
-              <div className="p-3 bg-green-50 border border-green-100 rounded-lg flex items-center space-x-2 text-green-700 text-sm">
-                <ShieldCheck size={18} />
-                <span>Documento em conformidade</span>
+              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-3xl flex items-center gap-3 text-emerald-700 text-xs font-bold leading-tight">
+                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 shrink-0">
+                  <ShieldCheck size={16} />
+                </div>
+                <span>Documento em Total Conformidade.</span>
               </div>
             )}
           </div>
 
-          <div className="card space-y-4">
-            <h3 className="font-bold text-slate-800 border-b border-slate-100 pb-2">Dados da Drogaria</h3>
-            <div className="text-xs space-y-2 text-slate-500">
-              <p><span className="font-semibold text-slate-700">Empresa:</span> {drugstore?.name}</p>
-              <p><span className="font-semibold text-slate-700">CRF:</span> {drugstore?.crf}</p>
-              <p><span className="font-semibold text-slate-700">Endereço:</span> {drugstore?.address}</p>
+          <div className="card shadow-xl shadow-slate-200/50 border-none p-8 space-y-6 bg-white overflow-hidden relative group">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-blue-600/5 blur-2xl -mr-10 -mt-10"></div>
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-4 flex items-center justify-between">
+              Assinatura Institucional
+              <Layout size={14} className="text-slate-200" />
+            </h3>
+            <div className="space-y-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-black uppercase text-slate-300 tracking-widest">Drogaria</span>
+                <span className="text-sm font-black text-slate-900 leading-tight uppercase">{drugstore?.name}</span>
+              </div>
+              <div className="flex justify-between items-end">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-black uppercase text-slate-300 tracking-widest">Responsável (CRF)</span>
+                  <span className="text-[12px] font-bold text-slate-500 uppercase">{drugstore?.crf || '-'}</span>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => navigate('/profile')}
+                  className="w-8 h-8 flex items-center justify-center bg-slate-50 text-slate-400 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-all border border-transparent hover:border-blue-100"
+                  title="Configurar Drogaria"
+                >
+                  <Edit size={14} />
+                </button>
+              </div>
             </div>
-            <button 
-              type="button"
-              onClick={() => navigate('/profile')}
-              className="text-xs font-medium text-sky-600 hover:underline flex items-center gap-1"
-            >
-              <Layout size={12} /> Editar dados da drogaria
-            </button>
           </div>
         </div>
       </div>

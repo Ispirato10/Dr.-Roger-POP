@@ -192,31 +192,49 @@ export default function Forms() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-slate-800">Formulários Padrão</h1>
-        <p className="text-slate-500">Modelos prontos para impressão e controle manual na drogaria.</p>
+    <div className="space-y-10 px-1 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-100">
+        <div className="flex items-center gap-5">
+          <div className="relative">
+            <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl shadow-xl shadow-blue-500/20 flex items-center justify-center border border-white/20">
+              <ClipboardCheck size={32} className="drop-shadow-md" />
+            </div>
+            <div className="absolute -bottom-1 -right-1 bg-white p-1.5 rounded-full shadow-md border border-slate-50">
+              <Download size={14} className="text-blue-600" />
+            </div>
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+              Formulários Técnicos
+              <span className="text-[10px] bg-blue-50 text-blue-600 font-black px-2.5 py-1 rounded-full uppercase tracking-widest border border-blue-100">PDF Ready</span>
+            </h1>
+            <p className="text-sm text-slate-400 font-bold tracking-tight uppercase mt-0.5">Modelos normativos para conformidade imediata</p>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {STANDARD_FORMS.map((form) => (
-          <div key={form.id} className="card flex flex-col justify-between hover:shadow-md transition-shadow">
-            <div className="space-y-4">
-              <div className="p-3 bg-sky-50 text-sky-600 rounded-xl w-fit">
-                <form.icon size={24} />
+          <div key={form.id} className="card group shadow-xl shadow-slate-100/50 border-none p-8 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 bg-white overflow-hidden relative">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-600/5 blur-2xl -mr-12 -mt-12 group-hover:bg-blue-600/10 transition-colors"></div>
+            
+            <div className="space-y-6 relative z-10">
+              <div className="w-14 h-14 bg-slate-50 text-blue-600 rounded-2xl flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all shadow-inner border border-slate-100 group-hover:border-blue-600">
+                <form.icon size={28} className="group-hover:scale-110 transition-transform" />
               </div>
               <div>
-                <h3 className="font-bold text-slate-800">{form.title}</h3>
-                <p className="text-sm text-slate-500 mt-1">{form.description}</p>
+                <h3 className="text-lg font-black text-slate-900 tracking-tight leading-tight uppercase mb-2">{form.title}</h3>
+                <p className="text-sm text-slate-500 font-medium leading-relaxed">{form.description}</p>
               </div>
             </div>
+
             <button
               disabled={generating === form.id}
               onClick={() => downloadForm(form.id, form.title)}
-              className="mt-6 flex items-center justify-center space-x-2 text-sky-600 font-medium py-2 px-4 rounded-lg bg-sky-50 hover:bg-sky-100 transition-colors disabled:opacity-50"
+              className="mt-8 flex items-center justify-center gap-3 w-full bg-slate-50 hover:bg-blue-600 text-slate-600 hover:text-white font-black py-4 px-6 rounded-2xl transition-all disabled:opacity-50 group/btn border border-slate-100 hover:border-blue-600"
             >
-              {generating === form.id ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
-              <span>{generating === form.id ? 'Gerando...' : 'Baixar PDF'}</span>
+              {generating === form.id ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} className="group-hover/btn:translate-y-0.5 transition-transform" />}
+              <span className="uppercase tracking-widest text-[10px]">{generating === form.id ? 'Gerando Arquivo...' : 'Baixar Modelo PDF'}</span>
             </button>
           </div>
         ))}

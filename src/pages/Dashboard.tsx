@@ -94,110 +94,119 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-10">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#1e293b]">Visão Geral</h1>
-          <p className="text-sm text-[#64748b]">Gestão normativa e controle de procedimentos operacionais padrão.</p>
+          <h1 className="text-3xl font-black text-slate-900 leading-none">Visão Geral</h1>
+          <p className="text-sm text-slate-500 mt-2 font-medium tracking-tight">Gestão normativa e controle de procedimentos operacionais padrão.</p>
         </div>
-        <Link to="/pops/new" className="btn-primary flex items-center space-x-2 self-start md:self-auto">
-          <PlusCircle size={18} />
-          <span>Novo POP</span>
+        <Link to="/pops/new" className="btn-primary flex items-center space-x-2 self-start md:self-auto group">
+          <PlusCircle size={20} className="group-hover:rotate-90 transition-transform duration-300" />
+          <span>Criar Novo POP</span>
         </Link>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-[#e2e8f0] rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-[#2563eb]">{stats.total}</div>
-          <div className="text-[12px] text-[#64748b] uppercase font-semibold mt-1">Total POPs</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="card bg-white border-blue-50/50 p-6 flex flex-col gap-1 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 blur-3xl -mr-12 -mt-12 group-hover:bg-blue-500/10 transition-colors"></div>
+          <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none mb-1">Total de POPs</div>
+          <div className="text-4xl font-black text-blue-600 leading-none tracking-tight">{stats.total}</div>
         </div>
 
-        <div className="bg-white border border-[#e2e8f0] rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-[#2563eb]">{stats.active}</div>
-          <div className="text-[12px] text-[#64748b] uppercase font-semibold mt-1">POPs Ativos</div>
+        <div className="card bg-white border-emerald-50/50 p-6 flex flex-col gap-1 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 blur-3xl -mr-12 -mt-12 group-hover:bg-emerald-500/10 transition-colors"></div>
+          <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none mb-1">POPs Ativos</div>
+          <div className="text-4xl font-black text-emerald-600 leading-none tracking-tight">{stats.active}</div>
         </div>
 
-        <div className="bg-white border border-[#e2e8f0] rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-[#2563eb]">{stats.drafts}</div>
-          <div className="text-[12px] text-[#64748b] uppercase font-semibold mt-1">Aguardando Revisão</div>
+        <div className="card bg-white border-amber-50/50 p-6 flex flex-col gap-1 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 blur-3xl -mr-12 -mt-12 group-hover:bg-amber-500/10 transition-colors"></div>
+          <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none mb-1">Aguardando Revisão</div>
+          <div className="text-4xl font-black text-amber-600 leading-none tracking-tight">{stats.drafts}</div>
         </div>
 
-        <div className="bg-white border border-[#e2e8f0] rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-[#2563eb]">100%</div>
-          <div className="text-[12px] text-[#64748b] uppercase font-semibold mt-1">Conformidade</div>
+        <div className="card bg-gradient-to-br from-blue-600 to-indigo-700 p-6 flex flex-col gap-1 relative overflow-hidden border-none group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-white/20 blur-3xl -mr-12 -mt-12"></div>
+          <div className="text-[10px] text-blue-100 font-black uppercase tracking-widest leading-none mb-1">Conformidade</div>
+          <div className="text-4xl font-black text-white leading-none tracking-tight">100%</div>
         </div>
       </div>
 
-      <div className="bg-white border border-[#e2e8f0] rounded-lg overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.1)] flex flex-col">
-        <div className="p-4 border-b border-[#e2e8f0] flex justify-between items-center bg-[#f8fafc]">
-          <span className="font-bold text-sm text-[#1e293b]">Documentos Recentes</span>
-          <Link to="/pops" className="text-xs font-semibold text-[#2563eb] hover:underline">Ver todos os documentos &rarr;</Link>
+      <div className="card p-0 overflow-hidden bg-white">
+        <div className="px-8 py-5 border-b border-slate-50 flex justify-between items-center">
+          <h2 className="text-base font-black text-slate-900 tracking-tight">Documentos Recentes</h2>
+          <Link to="/pops" className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 group">
+            Ver repositório completo
+            <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+          </Link>
         </div>
         
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-[#f8fafc] border-b border-[#e2e8f0]">
-                <th className="px-4 py-3 text-[13px] font-semibold text-[#64748b]">Código</th>
-                <th className="px-4 py-3 text-[13px] font-semibold text-[#64748b]">Procedimento Operacional Padrão</th>
-                <th className="px-4 py-3 text-[13px] font-semibold text-[#64748b]">Versão</th>
-                <th className="px-4 py-3 text-[13px] font-semibold text-[#64748b]">Última Revisão</th>
-                <th className="px-4 py-3 text-[13px] font-semibold text-[#64748b]">Status</th>
-                <th className="px-4 py-3 text-[13px] font-semibold text-[#64748b]">Ações</th>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Código</th>
+                <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Procedimento Operacional Padrão</th>
+                <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ações</th>
               </tr>
             </thead>
             <tbody>
               {recentPops.length > 0 ? recentPops.map((pop) => (
-                <tr key={pop.id} className="border-b border-[#f1f5f9] hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 text-sm font-mono text-slate-500">{pop.code}</td>
-                  <td className="px-4 py-3 text-sm font-medium text-[#1e293b]">{pop.title}</td>
-                  <td className="px-4 py-3 text-sm text-slate-500">v{pop.version}.0</td>
-                  <td className="px-4 py-3 text-sm text-slate-500">
-                    {pop.updatedAt ? format(new Date(pop.updatedAt), 'dd/MM/yyyy') : '-'}
+                <tr key={pop.id} className="border-b border-slate-50 hover:bg-slate-50/80 transition-all group">
+                  <td className="px-8 py-5">
+                    <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">{pop.code}</span>
                   </td>
-                  <td className="px-4 py-3">
-                    <span className={`status-tag ${pop.status === 'active' ? 'status-active' : 'status-review'}`}>
-                      {pop.status === 'active' ? 'Ativo' : 'Rascunho'}
-                    </span>
+                  <td className="px-8 py-5">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm font-black text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">{pop.title}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">v{pop.version}.0</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">•</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Rev. {pop.updatedAt ? format(new Date(pop.updatedAt), 'dd/MM/yyyy') : '-'}</span>
+                        <span className={`status-tag ${pop.status === 'active' ? 'status-active' : 'status-review'}`}>
+                          {pop.status === 'active' ? 'Ativo' : 'Rascunho'}
+                        </span>
+                      </div>
+                    </div>
                   </td>
-                   <td className="px-4 py-3 text-sm">
-                    <div className="flex items-center space-x-2">
+                  <td className="px-8 py-5">
+                    <div className="flex items-center gap-3">
                       <Link 
                         to={`/pops/edit/${pop.id}`} 
-                        className="p-1.5 text-[#2563eb] hover:bg-blue-50 rounded transition-all"
-                        title="Editar"
+                        className="w-9 h-9 flex items-center justify-center bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                        title="Editar Documento"
                       >
                         <Edit size={16} />
                       </Link>
-                       <button 
-                         type="button"
-                         disabled={isDeleting === pop.id}
-                         onClick={(e) => {
-                           e.stopPropagation();
-                           handleDelete(pop.id, e as any);
-                         }}
-                         className={`p-2 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed group/del flex items-center justify-center cursor-pointer shadow-sm border ${
-                           confirmDelete === pop.id 
-                             ? 'bg-red-600 text-white hover:bg-red-700 border-red-700' 
-                             : 'text-red-500 bg-red-50 hover:bg-red-100 border-red-100'
-                         }`}
-                         title={confirmDelete === pop.id ? "Clique novamente para confirmar a exclusão" : "Excluir Permanentemente"}
-                       >
-                         {isDeleting === pop.id ? (
-                           <Loader2 size={16} className="animate-spin" />
-                         ) : confirmDelete === pop.id ? (
-                           <span className="text-[10px] font-bold px-1 uppercase leading-none">Confirmar?</span>
-                         ) : (
-                           <Trash2 size={16} className="group-hover/del:scale-110 transition-transform" />
-                         )}
-                       </button>
+                      <button 
+                        type="button"
+                        disabled={isDeleting === pop.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(pop.id, e as any);
+                        }}
+                        className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-sm border ${
+                          confirmDelete === pop.id 
+                            ? 'bg-red-600 text-white hover:bg-red-700 border-red-700' 
+                            : 'text-red-500 bg-red-50 hover:bg-red-100 border-red-100'
+                        }`}
+                        title={confirmDelete === pop.id ? "Clique novamente para confirmar a exclusão" : "Excluir Permanentemente"}
+                      >
+                        {isDeleting === pop.id ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : confirmDelete === pop.id ? (
+                          <span className="text-[8px] font-black px-1 leading-none">OK?</span>
+                        ) : (
+                          <Trash2 size={16} />
+                        )}
+                      </button>
                     </div>
                   </td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">Nenhum documento recente.</td>
+                  <td colSpan={3} className="px-8 py-16 text-center text-sm text-slate-400 font-medium">Nenhum documento recente encontrado.</td>
                 </tr>
               )}
             </tbody>
