@@ -15,6 +15,7 @@ import {
   ClipboardCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { PWAInstall } from './PWAInstall';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, drugstore } = useAuth();
@@ -136,6 +137,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             />
           )}
         </AnimatePresence>
+        <PWAInstall />
       </div>
     </div>
   );
