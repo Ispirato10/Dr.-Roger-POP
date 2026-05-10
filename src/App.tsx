@@ -9,6 +9,7 @@ import DrugstoreProfile from './pages/DrugstoreProfile';
 import PopList from './pages/PopList';
 import PopEditor from './pages/PopEditor';
 import Forms from './pages/Forms';
+import Donation from './pages/Donation';
 
 export default function App() {
   return (
@@ -38,6 +39,14 @@ export default function App() {
               <AuthGuard>
                 <RegistrationGuard>
                   <Forms />
+                </RegistrationGuard>
+              </AuthGuard>
+            } />
+
+            <Route path="/support" element={
+              <AuthGuard>
+                <RegistrationGuard>
+                  <Donation />
                 </RegistrationGuard>
               </AuthGuard>
             } />

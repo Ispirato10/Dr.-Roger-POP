@@ -23,6 +23,7 @@ export default defineConfig(({mode}) => {
           display: 'standalone',
           orientation: 'portrait',
           start_url: '.',
+          scope: '/',
           icons: [
             {
               src: 'logorogerpop.png',
@@ -41,6 +42,22 @@ export default defineConfig(({mode}) => {
               sizes: '192x192 512x512',
               type: 'image/png',
               purpose: 'maskable'
+            }
+          ],
+          screenshots: [
+            {
+              src: 'logorogerpop.png',
+              sizes: '512x512',
+              type: 'image/png',
+              form_factor: 'wide',
+              label: 'Dr. Roger POP Dashboard'
+            },
+            {
+              src: 'logorogerpop.png',
+              sizes: '512x512',
+              type: 'image/png',
+              form_factor: 'narrow',
+              label: 'Dr. Roger POP Mobile'
             }
           ]
         },

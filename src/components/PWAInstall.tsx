@@ -14,6 +14,7 @@ export const PWAInstall: React.FC = () => {
     }
 
     const handler = (e: any) => {
+      console.log('beforeinstallprompt event fired');
       // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
       // Stash the event so it can be triggered later.
@@ -24,8 +25,17 @@ export const PWAInstall: React.FC = () => {
 
     window.addEventListener('beforeinstallprompt', handler);
 
+    // Also check if app is already installed via appinstalled event
+    const installedHandler = () => {
+      console.log('App was installed');
+      setIsStandalone(true);
+      setShowInstallBanner(false);
+    };
+    window.addEventListener('appinstalled', installedHandler);
+
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', installedHandler);
     };
   }, []);
 
@@ -57,34 +67,42 @@ export const PWAInstall: React.FC = () => {
         initial={{ opacity: 0, y: 100 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 100 }}
-        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-full max-w-sm px-4"
+        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-full max-w-md px-4"
       >
-        <div className="bg-[#1e293b] text-white p-4 rounded-2xl shadow-2xl border border-[#334155] flex flex-col gap-3">
+        <div className="bg-[#0f172a] text-white p-5 rounded-2xl shadow-[0_20px_50px_rgba(37,99,235,0.3)] border border-[#334155] flex flex-col gap-4">
           <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#2563eb] rounded-xl flex items-center justify-center">
-                <Smartphone size={20} />
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-[#2563eb] rounded-xl flex items-center justify-center shadow-lg">
+                <Smartphone size={24} />
               </div>
               <div>
-                <h3 className="font-bold text-sm leading-tight">Instalar Aplicativo</h3>
-                <p className="text-xs text-[#94a3b8]">Acesse o Dr. Roger POP mais rápido direto da sua tela inicial</p>
+                <h3 className="font-bold text-base leading-tight">Instalar Dr. Roger POP</h3>
+                <p className="text-sm text-[#94a3b8] mt-1">Acesse o sistema com um clique direto do seu computador ou celular.</p>
               </div>
             </div>
             <button 
               onClick={() => setShowInstallBanner(false)}
-              className="text-[#94a3b8] hover:text-white transition-colors"
+              className="text-[#94a3b8] hover:text-white p-1 transition-colors"
             >
-              <X size={18} />
+              <X size={20} />
             </button>
           </div>
           
-          <button
-            onClick={handleInstallClick}
-            className="w-full bg-[#2563eb] hover:bg-[#3b82f6] text-white py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
-          >
-            <Download size={16} />
-            Instalar Agora
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowInstallBanner(false)}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-[#94a3b8] hover:text-white transition-colors"
+            >
+              Agora não
+            </button>
+            <button
+              onClick={handleInstallClick}
+              className="flex-[2] bg-[#2563eb] hover:bg-[#3b82f6] text-white py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-blue-500/20"
+            >
+              <Download size={18} />
+              Instalar Aplicativo
+            </button>
+          </div>
         </div>
       </motion.div>
     </AnimatePresence>

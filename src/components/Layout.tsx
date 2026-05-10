@@ -13,7 +13,8 @@ import {
   Menu,
   X,
   ClipboardCheck,
-  Share2
+  Share2,
+  Heart
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PWAInstall } from './PWAInstall';
@@ -40,6 +41,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     { name: 'Formulários', path: '/forms', icon: ClipboardCheck },
     { name: 'Novo POP', path: '/pops/new', icon: PlusCircle },
     { name: 'Dados da Drogaria', path: '/profile', icon: Building2 },
+    { name: 'Apoiar Projeto', path: '/support', icon: Heart },
   ];
 
   if (!user) return <>{children}</>;
