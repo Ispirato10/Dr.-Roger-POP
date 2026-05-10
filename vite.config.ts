@@ -13,7 +13,7 @@ export default defineConfig(({mode}) => {
       VitePWA({
         registerType: 'autoUpdate',
         injectRegister: 'auto',
-        includeAssets: ['logo.svg'],
+        includeAssets: ['logorogerpop.png', 'logo.svg'],
         manifest: {
           name: 'Dr. Roger POP - Gestão Farmacêutica',
           short_name: 'DrRogerPOP',
@@ -32,15 +32,21 @@ export default defineConfig(({mode}) => {
           prefer_related_applications: false,
           icons: [
             {
-              src: 'logo.svg',
-              sizes: '512x512',
-              type: 'image/svg+xml',
+              src: 'logorogerpop.png',
+              sizes: '192x192',
+              type: 'image/png',
               purpose: 'any'
             },
             {
-              src: 'logo.svg',
+              src: 'logorogerpop.png',
               sizes: '512x512',
-              type: 'image/svg+xml',
+              type: 'image/png',
+              purpose: 'any'
+            },
+            {
+              src: 'logorogerpop.png',
+              sizes: '512x512',
+              type: 'image/png',
               purpose: 'maskable'
             }
           ],
