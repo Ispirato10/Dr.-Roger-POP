@@ -13,7 +13,7 @@ export default defineConfig(({mode}) => {
       VitePWA({
         registerType: 'autoUpdate',
         injectRegister: 'auto',
-        includeAssets: ['logorogerpop.png', 'logo.svg', 'favicon.ico', 'apple-touch-icon.png'],
+        includeAssets: ['logo.svg'],
         manifest: {
           name: 'Dr. Roger POP - Gestão Farmacêutica',
           short_name: 'DrRogerPOP',
@@ -32,40 +32,18 @@ export default defineConfig(({mode}) => {
           prefer_related_applications: false,
           icons: [
             {
-              src: 'logorogerpop.png',
-              sizes: '192x192',
-              type: 'image/png',
-              purpose: 'any'
-            },
-            {
-              src: 'logorogerpop.png',
+              src: 'logo.svg',
               sizes: '512x512',
-              type: 'image/png',
+              type: 'image/svg+xml',
               purpose: 'any'
             },
             {
-              src: 'logorogerpop.png',
-              sizes: '192x192 512x512',
-              type: 'image/png',
+              src: 'logo.svg',
+              sizes: '512x512',
+              type: 'image/svg+xml',
               purpose: 'maskable'
             }
           ],
-          screenshots: [
-            {
-              src: 'logorogerpop.png',
-              sizes: '512x512',
-              type: 'image/png',
-              form_factor: 'wide',
-              label: 'Dr. Roger POP Dashboard'
-            },
-            {
-              src: 'logorogerpop.png',
-              sizes: '512x512',
-              type: 'image/png',
-              form_factor: 'narrow',
-              label: 'Dr. Roger POP Mobile'
-            }
-          ]
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
