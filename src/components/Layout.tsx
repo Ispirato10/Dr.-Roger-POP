@@ -12,7 +12,8 @@ import {
   Building2,
   Menu,
   X,
-  ClipboardCheck
+  ClipboardCheck,
+  Share2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PWAInstall } from './PWAInstall';
@@ -76,33 +77,57 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       <div className="flex flex-1 overflow-hidden relative">
         {/* Sidebar */}
         <aside className={sidebarClasses}>
-          <nav className="flex flex-col space-y-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                onClick={() => setIsMenuOpen(false)}
-                className={`nav-item ${location.pathname === item.path ? 'nav-item-active' : ''}`}
-              >
-                <item.icon size={18} />
-                <span className="text-sm">{item.name}</span>
-              </Link>
-            ))}
-          </nav>
+          <div className="flex-1 overflow-y-auto px-1 py-1 custom-scrollbar">
+            <nav className="flex flex-col space-y-1">
+              {navItems.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setIsMenuOpen(false)}
+                  className={`nav-item ${location.pathname === item.path ? 'nav-item-active' : ''}`}
+                >
+                  <item.icon size={18} />
+                  <span className="text-sm">{item.name}</span>
+                </Link>
+              ))}
+            </nav>
 
-          <div className="mt-6">
-            <div className="text-[11px] font-bold text-[#94a3b8] uppercase mb-3 px-3 tracking-wider">Categorias Rápidas</div>
-            <div className="flex flex-col space-y-0.5">
-              <span className="px-3 py-1.5 text-sm text-[#475569] cursor-pointer hover:text-[#2563eb] transition-colors">• Sanitização</span>
-              <span className="px-3 py-1.5 text-sm text-[#475569] cursor-pointer hover:text-[#2563eb] transition-colors">• Dispensação</span>
-              <span className="px-3 py-1.5 text-sm text-[#475569] cursor-pointer hover:text-[#2563eb] transition-colors">• Psicotrópicos</span>
+            <div className="mt-6">
+              <div className="text-[11px] font-bold text-[#94a3b8] uppercase mb-3 px-3 tracking-wider">Categorias Rápidas</div>
+              <div className="flex flex-col space-y-0.5">
+                {[
+                  'Assistência',
+                  'Controlados',
+                  'Logística',
+                  'Sanitário',
+                  'Gestão',
+                  'Qualidade'
+                ].map((cat) => (
+                  <Link 
+                    key={cat}
+                    to={`/pops?q=${encodeURIComponent(cat)}`} 
+                    onClick={() => setIsMenuOpen(false)}
+                    className="px-3 py-1.5 text-sm text-[#475569] hover:text-[#2563eb] transition-colors flex items-center"
+                  >
+                    <span className="mr-2 opacity-50">•</span> {cat}
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="mt-auto space-y-4 pt-4 border-t border-[#f1f5f9]">
-            <div className="px-3 py-1 bg-[#1e293b] text-[#cbd5e1] text-[11px] rounded-full text-center border border-[#334155]">
-              Licença Válida até Out 2026
-            </div>
+          <div className="pt-4 border-t border-[#f1f5f9] shrink-0 space-y-3">
+            <button
+              onClick={() => {
+                const text = encodeURIComponent("Acesse o Dr. Roger POP - Sistema de Gestão Farmacêutica: https://dr-roger-pop.vercel.app");
+                window.open(`https://wa.me/?text=${text}`, '_blank');
+              }}
+              className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-all text-sm font-bold shadow-sm"
+            >
+              <Share2 size={16} />
+              <span>Compartilhar Web App</span>
+            </button>
+
             <button
               onClick={handleSignOut}
               className="w-full flex items-center space-x-3 px-3 py-2.5 text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-md transition-all text-sm font-medium"

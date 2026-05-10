@@ -14,7 +14,11 @@ export default function Login() {
       await signInWithPopup(auth, provider);
       navigate('/');
     } catch (err: any) {
-      setError(err.message);
+      if (err.code === 'auth/unauthorized-domain') {
+        setError("Domínio não autorizado. Adicione o domínio atual (ex: vercel.app) no Console do Firebase > Authentication > Settings > Authorized Domains.");
+      } else {
+        setError(err.message);
+      }
     }
   };
 

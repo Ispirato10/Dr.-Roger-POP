@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { collection, query, where, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { 
   FileText, 
   Search, 
@@ -20,10 +20,20 @@ import { format } from 'date-fns';
 
 export default function PopList() {
   const { drugstore } = useAuth();
+  const [searchParams] = useSearchParams();
+  const queryParam = searchParams.get('q');
+  
   const [pops, setPops] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [searchTerm, setSearchTerm] = React.useState('');
+  const [searchTerm, setSearchTerm] = React.useState(queryParam || '');
   const [filterStatus, setFilterStatus] = React.useState('all');
+
+  // Update search term when query param changes
+  React.useEffect(() => {
+    if (queryParam !== null) {
+      setSearchTerm(queryParam);
+    }
+  }, [queryParam]);
 
   const fetchPops = async () => {
     if (!drugstore) return;
@@ -74,7 +84,8 @@ export default function PopList() {
 
   const filteredPops = pops.filter(pop => {
     const matchesSearch = pop.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          pop.code.toLowerCase().includes(searchTerm.toLowerCase());
+                          pop.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (pop.category && pop.category.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = filterStatus === 'all' || pop.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
