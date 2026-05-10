@@ -1,0 +1,120 @@
+{
+  "entities": {
+    "Drugstore": {
+      "title": "Drugstore",
+      "description": "Dados da drogaria/farmácia",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "cnpj": { "type": "string" },
+        "address": { "type": "string" },
+        "crf": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "hours": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["name", "cnpj", "crf", "ownerId"]
+    },
+    "Professional": {
+      "title": "Professional",
+      "description": "Farmacêuticos e responsáveis técnicos",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "cpf": { "type": "string" },
+        "crf": { "type": "string" },
+        "role": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "drugstoreId": { "type": "string" }
+      },
+      "required": ["name", "crf", "drugstoreId"]
+    },
+    "POP": {
+      "title": "Standard Operating Procedure (POP)",
+      "description": "Documento de procedimento operacional padrão",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "code": { "type": "string" },
+        "version": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "objective": { "type": "string" },
+        "responsible": { "type": "string" },
+        "materials": { "type": "string" },
+        "procedure": { "type": "string" },
+        "references": { "type": "string" },
+        "relatedForms": { "type": "array" },
+        "status": { "type": "string", "enum": ["draft", "active", "archived"] },
+        "drugstoreId": { "type": "string" },
+        "authorId": { "type": "string" }
+      },
+      "required": ["title", "code", "version", "drugstoreId"]
+    },
+    "POPTemplate": {
+      "title": "POP Template",
+      "description": "Modelos padrão sugeridos pelo sistema",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "objectiveDefault": { "type": "string" },
+        "responsibleDefault": { "type": "string" },
+        "materialsDefault": { "type": "string" },
+        "procedureDefault": { "type": "string" },
+        "referencesDefault": { "type": "string" }
+      }
+    },
+    "FormTemplate": {
+      "title": "Form Template",
+      "description": "Modelos de formulários padrão",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "type": { "type": "string" },
+        "fields": { "type": "array" }
+      }
+    },
+    "POPRevision": {
+      "title": "POP Revision History",
+      "description": "Histérico de revisões de um POP",
+      "type": "object",
+      "properties": {
+        "popId": { "type": "string" },
+        "version": { "type": "number" },
+        "previousData": { "type": "object" },
+        "changedBy": { "type": "string" },
+        "changeDate": { "type": "string", "format": "date-time" },
+        "reason": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/drugstores/{drugstoreId}": {
+      "schema": "Drugstore",
+      "description": "Coleção de drogarias"
+    },
+    "/professionals/{professionalId}": {
+      "schema": "Professional",
+      "description": "Coleção de profissionais"
+    },
+    "/pops/{popId}": {
+      "schema": "POP",
+      "description": "Coleção de POPs"
+    },
+    "/popTemplates/{templateId}": {
+      "schema": "POPTemplate",
+      "description": "Coleção de modelos de POPs"
+    },
+    "/formTemplates/{templateId}": {
+      "schema": "FormTemplate",
+      "description": "Coleção de modelos de formulários"
+    },
+    "/revisions/{revisionId}": {
+      "schema": "POPRevision",
+      "description": "Coleção de histórico de revisões"
+    }
+  }
+}
