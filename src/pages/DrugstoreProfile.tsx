@@ -1,5 +1,6 @@
 import React from 'react';
 import { useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,6 +23,7 @@ type DrugstoreFormValues = z.infer<typeof drugstoreSchema>;
 
 export default function DrugstoreProfile() {
   const { user, drugstore, refreshDrugstore } = useAuth();
+  const navigate = useNavigate();
   const [saving, setSaving] = React.useState(false);
   const [success, setSuccess] = React.useState(false);
   const [logoPreview, setLogoPreview] = React.useState<string | null>(drugstore?.logoUrl || null);
@@ -59,7 +61,12 @@ export default function DrugstoreProfile() {
       
       await refreshDrugstore();
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      
+      // Pequeno delay para o usuário ver a mensagem de sucesso antes de redirecionar
+      setTimeout(() => {
+        setSuccess(false);
+        navigate('/');
+      }, 1500);
     } catch (error) {
       console.error("Error saving drugstore:", error);
     } finally {

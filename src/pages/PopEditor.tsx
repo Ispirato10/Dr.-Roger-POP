@@ -22,12 +22,18 @@ import {
   ListOrdered,
   Link2,
   Layout,
+  Plus,
+  Image as ImageIcon,
+  X,
+  Type,
+  AlignJustify
 } from 'lucide-react';
 import { POP_TEMPLATES, POPTemplate } from '../constants/templates';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
-import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle } from 'docx';
+import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, ImageRun, Table, TableRow, TableCell, WidthType, BorderStyle, VerticalAlign } from 'docx';
+import { useFieldArray } from 'react-hook-form';
 import { saveAs } from 'file-saver';
 
 const popSchema = z.object({
@@ -46,6 +52,14 @@ const popSchema = z.object({
   references: z.string().optional(),
   status: z.enum(['draft', 'active', 'archived']),
   version: z.number(),
+  images: z.array(z.object({
+    url: z.string(),
+    caption: z.string().optional(),
+  })).optional(),
+  customFields: z.array(z.object({
+    label: z.string(),
+    value: z.string(),
+  })).optional(),
 });
 
 type PopFormValues = z.infer<typeof popSchema>;
@@ -58,7 +72,7 @@ export default function PopEditor() {
   const [saving, setSaving] = React.useState(false);
   const [showTemplates, setShowTemplates] = React.useState(!id);
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<PopFormValues>({
+  const { register, handleSubmit, reset, setValue, watch, control, formState: { errors } } = useForm<PopFormValues>({
     resolver: zodResolver(popSchema),
     defaultValues: {
       title: '',
@@ -69,60 +83,229 @@ export default function PopEditor() {
       reviewFrequency: 'Anual',
       status: 'draft',
       version: 1,
+      images: [],
+      customFields: [],
     }
+  });
+
+  const { fields: imageFields, append: appendImage, remove: removeImage } = useFieldArray({
+    control,
+    name: "images"
+  });
+
+  const { fields: customFieldItems, append: appendCustomField, remove: removeCustomField } = useFieldArray({
+    control,
+    name: "customFields"
   });
 
   const currentValues = watch();
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert("A imagem deve ter no máximo 2MB");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        appendImage({ url: reader.result as string, caption: '' });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const generateDOCX = async () => {
+    const children: any[] = [];
+
+    // Header Table
+    let logoImageRun: ImageRun | null = null;
+    if (drugstore?.logoUrl) {
+      try {
+        const base64Data = drugstore.logoUrl.split(',')[1];
+        const binaryString = window.atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        logoImageRun = new ImageRun({
+          data: bytes,
+          transformation: { width: 80, height: 50 },
+        } as any);
+      } catch (e) {
+        console.error("Error processing logo for DOCX header:", e);
+      }
+    }
+
+    const headerTable = new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({
+              children: logoImageRun ? [new Paragraph({ children: [logoImageRun], alignment: AlignmentType.CENTER })] : [new Paragraph({ text: drugstore?.name || "LOGO", alignment: AlignmentType.CENTER })],
+              width: { size: 25, type: WidthType.PERCENTAGE },
+              verticalAlign: VerticalAlign.CENTER,
+            }),
+            new TableCell({
+              children: [
+                new Paragraph({
+                  text: "PROCEDIMENTO OPERACIONAL PADRÃO (POP)",
+                  heading: HeadingLevel.HEADING_2,
+                  alignment: AlignmentType.CENTER,
+                }),
+                new Paragraph({
+                  text: currentValues.title?.toUpperCase() || "SEM TÍTULO",
+                  alignment: AlignmentType.CENTER,
+                  spacing: { before: 100 },
+                }),
+              ],
+              width: { size: 50, type: WidthType.PERCENTAGE },
+              verticalAlign: VerticalAlign.CENTER,
+            }),
+            new TableCell({
+              children: [
+                new Paragraph({ children: [new TextRun({ text: `CÓDIGO: ${currentValues.code || "-"}`, size: 16 })] }),
+                new Paragraph({ children: [new TextRun({ text: `VERSÃO: ${currentValues.version}.0`, size: 16 })] }),
+                new Paragraph({ children: [new TextRun({ text: `DATA: ${format(new Date(), "dd/MM/yyyy")}`, size: 16 })] }),
+              ],
+              width: { size: 25, type: WidthType.PERCENTAGE },
+              verticalAlign: VerticalAlign.CENTER,
+            }),
+          ],
+        }),
+      ],
+    });
+
+    children.push(headerTable);
+    children.push(new Paragraph({ text: "", spacing: { after: 300 } }));
+
+    const standardSections = [
+      { label: "1. OBJETIVO", value: currentValues.objective },
+      { label: "2. CAMPO DE APLICAÇÃO", value: currentValues.applicationField },
+      { label: "3. DEFINIÇÕES", value: currentValues.definitions },
+      { label: "4. RESPONSÁVEL", value: currentValues.responsible },
+      { label: "5. MATERIAIS NECESSÁRIOS", value: currentValues.materials },
+      { label: "6. EQUIPAMENTOS DE PROTEÇÃO (EPI)", value: currentValues.epi },
+      { label: "7. RISCOS DA ATIVIDADE", value: currentValues.riscos },
+      { label: "8. PROCEDIMENTO DETALHADO", value: currentValues.procedure },
+      { label: "9. MONITORAMENTO E VERIFICAÇÃO", value: currentValues.monitoring },
+      { label: "10. FREQUÊNCIA DE REVISÃO", value: currentValues.reviewFrequency },
+      { label: "11. REFERÊNCIAS NORMATIVAS", value: currentValues.references },
+    ];
+
+    standardSections.forEach(section => {
+      children.push(new Paragraph({
+        children: [new TextRun({ text: section.label, bold: true, size: 22 })],
+        spacing: { before: 300, after: 100 },
+        shading: { fill: "F2F2F2" },
+      }));
+      children.push(new Paragraph({
+        text: section.value || "-",
+        spacing: { after: 200 },
+        alignment: AlignmentType.LEFT,
+      }));
+    });
+
+    // Add Custom Fields to DOCX
+    if (currentValues.customFields && currentValues.customFields.length > 0) {
+      children.push(new Paragraph({
+        children: [new TextRun({ text: "12. INFORMAÇÕES ADICIONAIS", bold: true, size: 22 })],
+        spacing: { before: 300, after: 100 },
+        shading: { fill: "F2F2F2" },
+      }));
+      currentValues.customFields.forEach(field => {
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: `${field.label.toUpperCase()}: `, bold: true }),
+            new TextRun({ text: field.value }),
+          ],
+          spacing: { after: 100 },
+          alignment: AlignmentType.LEFT,
+        }));
+      });
+    }
+
+    // Add Images to DOCX
+    if (currentValues.images && currentValues.images.length > 0) {
+      children.push(new Paragraph({
+        children: [new TextRun({ text: "ANEXO: IMAGENS ILUSTRATIVAS", bold: true, size: 22 })],
+        spacing: { before: 400, after: 200 },
+        shading: { fill: "F2F2F2" },
+      }));
+
+      for (const img of currentValues.images) {
+        try {
+          const base64Data = img.url.split(',')[1];
+          const binaryString = window.atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          
+          children.push(new Paragraph({
+            children: [
+              new ImageRun({
+                data: bytes,
+                transformation: { width: 500, height: 300 },
+              } as any),
+            ],
+            alignment: AlignmentType.CENTER,
+          }));
+          if (img.caption) {
+            children.push(new Paragraph({
+              text: img.caption,
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 },
+            }));
+          }
+        } catch (e) {
+          console.error("Error adding image to DOCX:", e);
+        }
+      }
+    }
+
+    // Signatures
+    children.push(new Paragraph({ text: "", spacing: { before: 500 } }));
+    const signatureTable = new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [
+                new Paragraph({ children: [new TextRun({ text: "ELABORADO POR:", bold: true, size: 16 })] }),
+                new Paragraph({ text: "\n\n_______________________\nResponsável Técnico", alignment: AlignmentType.CENTER, spacing: { before: 400 } }),
+                new Paragraph({ text: `Data: ${format(new Date(), "dd/MM/yyyy")}`, alignment: AlignmentType.CENTER }),
+              ],
+              margins: { top: 100, bottom: 100, left: 100, right: 100 },
+            }),
+            new TableCell({
+              children: [
+                new Paragraph({ children: [new TextRun({ text: "VERIFICADO POR:", bold: true, size: 16 })] }),
+                new Paragraph({ text: "\n\n_______________________\nGerência", alignment: AlignmentType.CENTER, spacing: { before: 400 } }),
+                new Paragraph({ text: `Data: ${format(new Date(), "dd/MM/yyyy")}`, alignment: AlignmentType.CENTER }),
+              ],
+              margins: { top: 100, bottom: 100, left: 100, right: 100 },
+            }),
+            new TableCell({
+              children: [
+                new Paragraph({ children: [new TextRun({ text: "APROVADO POR:", bold: true, size: 16 })] }),
+                new Paragraph({ text: "\n\n_______________________\nDiretoria", alignment: AlignmentType.CENTER, spacing: { before: 400 } }),
+                new Paragraph({ text: `Data: ${format(new Date(), "dd/MM/yyyy")}`, alignment: AlignmentType.CENTER }),
+              ],
+              margins: { top: 100, bottom: 100, left: 100, right: 100 },
+            }),
+          ],
+        }),
+      ],
+    });
+    children.push(signatureTable);
+
     const doc = new Document({
       sections: [{
         properties: {},
-        children: [
-          new Paragraph({
-            text: "Dr. Roger POP - Gestão de Conformidade",
-            heading: HeadingLevel.HEADING_1,
-            alignment: AlignmentType.CENTER,
-          }),
-          new Paragraph({
-            children: [
-              new TextRun({ text: `Drogaria: ${drugstore?.name || "-"}`, bold: true }),
-              new TextRun({ text: ` | CNPJ: ${drugstore?.cnpj || "-"}`, break: 1 }),
-              new TextRun({ text: ` | CRF: ${drugstore?.crf || "-"}`, break: 1 }),
-            ],
-            alignment: AlignmentType.CENTER,
-          }),
-          new Paragraph({ text: "", spacing: { after: 400 } }),
-          new Paragraph({
-            text: currentValues.title || "Sem título",
-            heading: HeadingLevel.HEADING_2,
-          }),
-          new Paragraph({
-            text: `Código: ${currentValues.code || "-"} | Versão: ${currentValues.version}.0 | Data: ${format(new Date(), "dd/MM/yyyy")}`,
-            spacing: { after: 200 },
-          }),
-          ...([
-            { label: "1. OBJETIVO", value: currentValues.objective },
-            { label: "2. CAMPO DE APLICAÇÃO", value: currentValues.applicationField },
-            { label: "3. DEFINIÇÕES", value: currentValues.definitions },
-            { label: "4. RESPONSÁVEL", value: currentValues.responsible },
-            { label: "5. MATERIAIS NECESSÁRIOS", value: currentValues.materials },
-            { label: "6. PROCEDIMENTO DETALHADO", value: currentValues.procedure },
-            { label: "7. MONITORAMENTO E VERIFICAÇÃO", value: currentValues.monitoring },
-            { label: "8. FREQUÊNCIA DE REVISÃO", value: currentValues.reviewFrequency },
-            { label: "9. REFERÊNCIAS NORMATIVAS", value: currentValues.references },
-          ].map(section => ([
-            new Paragraph({
-              text: section.label,
-              heading: HeadingLevel.HEADING_3,
-              spacing: { before: 200, after: 100 },
-            }),
-            new Paragraph({
-              text: section.value || "-",
-              spacing: { after: 200 },
-            })
-          ])).flat())
-        ],
+        children: children,
       }],
     });
 
@@ -162,6 +345,8 @@ export default function PopEditor() {
     setValue('reviewFrequency', template.reviewFrequency || 'Anual');
     setValue('references', template.references);
     setValue('code', `POP-${template.id.toUpperCase().substring(0, 4)}-01`);
+    setValue('images', []);
+    setValue('customFields', []);
     setShowTemplates(false);
   };
 
@@ -311,25 +496,90 @@ export default function PopEditor() {
     ];
 
     sections.forEach(section => {
-      // Check if we need a new page
       const splitValue = doc.splitTextToSize(section.value || '-', pageWidth - margin * 2);
-      const estimatedHeight = 10 + (splitValue.length * 5);
+      const estimatedHeight = 15 + (splitValue.length * 5);
       
-      if (y + estimatedHeight > 260) {
+      if (y + estimatedHeight > 270) {
         doc.addPage();
         y = 20;
       }
 
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text(section.label, margin, y);
-      y += 6;
+      autoTable(doc, {
+        startY: y,
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 10, cellPadding: 1, overflow: 'linebreak' },
+        headStyles: { fontSize: 11, fontStyle: 'bold', fillColor: [255, 255, 255], textColor: [0, 0, 0] },
+        body: [
+          [{ 
+            content: section.label, 
+            styles: { fontStyle: 'bold', fontSize: 11, cellPadding: { bottom: 2 }, halign: 'left' as const } 
+          }],
+          [{ 
+            content: section.value || '-',
+            styles: { halign: 'left' as const }
+          }]
+        ],
+        theme: 'plain'
+      });
       
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.text(splitValue, margin, y);
-      y += (splitValue.length * 5) + 8;
+      y = (doc as any).lastAutoTable.finalY + 8;
     });
+
+    // Custom Fields in PDF
+    if (currentValues.customFields && currentValues.customFields.length > 0) {
+      if (y > 250) { doc.addPage(); y = 20; }
+      
+      autoTable(doc, {
+        startY: y,
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 10, cellPadding: 1 },
+        body: [
+          [{ 
+            content: '12. INFORMAÇÕES ADICIONAIS', 
+            styles: { fontStyle: 'bold', fontSize: 11, cellPadding: { bottom: 2 }, halign: 'left' as const } 
+          }],
+          ...currentValues.customFields.map(field => [
+            { 
+              content: `${field.label.toUpperCase()}: ${field.value}`,
+              styles: { halign: 'left' as const }
+            }
+          ])
+        ],
+        theme: 'plain'
+      });
+      
+      y = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // Images in PDF
+    if (currentValues.images && currentValues.images.length > 0) {
+      currentValues.images.forEach((img, idx) => {
+        if (y > 200) {
+          doc.addPage();
+          y = 20;
+        } else {
+          y += 10;
+        }
+
+        try {
+          const imgWidth = 120;
+          const imgHeight = 80;
+          const centerX = (pageWidth - imgWidth) / 2;
+          
+          doc.addImage(img.url, 'PNG', centerX, y, imgWidth, imgHeight, undefined, 'FAST');
+          y += imgHeight + 5;
+          
+          if (img.caption) {
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'italic');
+            doc.text(img.caption, pageWidth / 2, y, { align: 'center' });
+            y += 8;
+          }
+        } catch (e) {
+          console.error("Error adding image to PDF:", e);
+        }
+      });
+    }
 
     // Approval Area
     if (y > 230) {
@@ -564,10 +814,105 @@ export default function PopEditor() {
 
               <div className="space-y-1">
                 <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
-                  <ListOrdered size={14} /> Procedimento (Passo a Passo)
+                  <AlignJustify size={14} /> Procedimento (Passo a Passo)
                 </label>
-                <textarea {...register('procedure')} rows={20} className="input-field font-mono text-sm leading-relaxed" placeholder="1. Inicie o processo...\n2. Verifique..." />
+                <textarea {...register('procedure')} rows={20} className="input-field font-sans text-sm leading-relaxed text-left" placeholder="1. Inicie o processo...\n2. Verifique..." />
                 {errors.procedure && <p className="text-xs text-red-500">{errors.procedure.message}</p>}
+              </div>
+
+              {/* Custom Fields Section */}
+              <div className="pt-6 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-4">
+                  <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
+                    <Type size={14} /> Campos Personalizados
+                  </label>
+                  <button 
+                    type="button"
+                    onClick={() => appendCustomField({ label: '', value: '' })}
+                    className="text-xs font-bold text-sky-600 hover:text-sky-700 flex items-center gap-1"
+                  >
+                    <Plus size={14} /> Adicionar Campo
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  {customFieldItems.map((field, index) => (
+                    <div key={field.id} className="flex flex-col md:flex-row gap-3 items-start bg-slate-50 p-3 rounded-xl border border-slate-100 relative group">
+                      <div className="flex-1 w-full space-y-1">
+                        <input 
+                          {...register(`customFields.${index}.label` as const)} 
+                          placeholder="Nome do campo (Ex: Observações)" 
+                          className="w-full text-xs font-bold uppercase bg-transparent border-none focus:ring-0 p-0 text-slate-500"
+                        />
+                        <textarea 
+                          {...register(`customFields.${index}.value` as const)} 
+                          placeholder="Conteúdo..." 
+                          className="w-full text-sm bg-white border border-slate-200 rounded-lg p-2 focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none"
+                          rows={2}
+                        />
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => removeCustomField(index)}
+                        className="p-1 text-slate-400 hover:text-red-500 transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                  {customFieldItems.length === 0 && (
+                    <p className="text-center py-4 text-xs text-slate-400 italic">Nenhum campo personalizado adicionado.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Images Section */}
+              <div className="pt-6 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-4">
+                  <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
+                    <ImageIcon size={14} /> Imagens Ilustrativas
+                  </label>
+                  <div className="relative">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleImageUpload}
+                      className="hidden" 
+                      id="image-upload"
+                    />
+                    <label 
+                      htmlFor="image-upload"
+                      className="text-xs font-bold text-sky-600 hover:text-sky-700 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus size={14} /> Adicionar Imagem
+                    </label>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {imageFields.map((field, index) => (
+                    <div key={field.id} className="relative group bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">
+                      <img src={field.url} alt="Preview" className="w-full h-40 object-cover" />
+                      <div className="p-2 space-y-2">
+                        <input 
+                          {...register(`images.${index}.caption` as const)} 
+                          placeholder="Legenda da imagem..." 
+                          className="w-full text-xs bg-white border border-slate-200 rounded-lg p-2 outline-none focus:ring-2 focus:ring-sky-500"
+                        />
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {imageFields.length === 0 && (
+                  <p className="text-center py-4 text-xs text-slate-400 italic">Nenhuma imagem ilustrativa adicionada.</p>
+                )}
               </div>
 
               <div className="space-y-1">
