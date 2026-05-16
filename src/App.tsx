@@ -9,6 +9,8 @@ import DrugstoreProfile from './pages/DrugstoreProfile';
 import PopList from './pages/PopList';
 import PopEditor from './pages/PopEditor';
 import Forms from './pages/Forms';
+import Anamnese from './pages/Anamnese';
+import Prescription from './pages/Prescription';
 import Donation from './pages/Donation';
 
 export default function App() {
@@ -31,6 +33,22 @@ export default function App() {
               <AuthGuard>
                 <RegistrationGuard>
                   <PopList />
+                </RegistrationGuard>
+              </AuthGuard>
+            } />
+
+            <Route path="/anamnesis" element={
+              <AuthGuard>
+                <RegistrationGuard>
+                  <Anamnese />
+                </RegistrationGuard>
+              </AuthGuard>
+            } />
+
+            <Route path="/prescription" element={
+              <AuthGuard>
+                <RegistrationGuard>
+                  <Prescription />
                 </RegistrationGuard>
               </AuthGuard>
             } />

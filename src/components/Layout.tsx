@@ -14,7 +14,9 @@ import {
   X,
   ClipboardCheck,
   Share2,
-  Heart
+  Heart,
+  Stethoscope,
+  Pill
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PWAInstall } from './PWAInstall';
@@ -25,18 +27,26 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
 
+  // Close menu on route or search change
+  React.useEffect(() => {
+    setIsMenuOpen(false);
+  }, [location.pathname, location.search]);
+
   const sidebarClasses = React.useMemo(() => `
     fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-[#e2e8f0] p-5 flex flex-col gap-2 transform transition-transform duration-300 md:relative md:translate-x-0
     ${isMenuOpen ? 'translate-x-0 pt-20' : '-translate-x-full'}
   `, [isMenuOpen]);
 
   const handleSignOut = async () => {
+    setIsMenuOpen(false);
     await signOut(auth);
     navigate('/login');
   };
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+    { name: 'Anamnese', path: '/anamnesis', icon: Stethoscope },
+    { name: 'Receituário', path: '/prescription', icon: Pill },
     { name: 'Meus POPs', path: '/pops', icon: FileText },
     { name: 'Formulários', path: '/forms', icon: ClipboardCheck },
     { name: 'Novo POP', path: '/pops/new', icon: PlusCircle },
@@ -51,12 +61,12 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       {/* Header */}
       <header className="h-16 bg-white border-b border-slate-100 shrink-0 z-50 flex items-center justify-between px-6">
         <div className="flex items-center space-x-3">
-          <div className="md:hidden mr-2">
+          <div className="mr-2">
             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 hover:bg-slate-50 rounded-xl transition-colors">
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
-          <div className="flex items-center space-x-4 cursor-pointer group" onClick={() => navigate('/')}>
+          <div className="flex items-center space-x-4 cursor-pointer group" onClick={() => { navigate('/'); setIsMenuOpen(false); }}>
             <div className="w-11 h-11 relative">
               <div className="absolute inset-0 bg-blue-600 blur-lg opacity-20 group-hover:opacity-40 transition-opacity"></div>
               <img src="/logorogerpop.png" alt="Logo" className="w-full h-full object-contain relative z-10 drop-shadow-md group-hover:scale-105 transition-transform" />
@@ -85,7 +95,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       <div className="flex flex-1 overflow-hidden relative">
         {/* Sidebar */}
         <aside className={`
-          fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-slate-100 p-6 flex flex-col gap-6 transform transition-transform duration-300 md:relative md:translate-x-0
+          fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-slate-100 p-6 flex flex-col gap-6 transform transition-transform duration-300
           ${isMenuOpen ? 'translate-x-0 pt-24' : '-translate-x-full'}
         `}>
           <div className="flex-1 overflow-y-auto px-1 py-1 custom-scrollbar">
@@ -131,6 +141,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           <div className="pt-6 border-t border-slate-50 shrink-0 space-y-4">
             <button
               onClick={() => {
+                setIsMenuOpen(false);
                 const text = encodeURIComponent("Acesse o Dr. Roger POP - Sistema de Gestão Farmacêutica: https://dr-roger-pop.vercel.app");
                 window.open(`https://wa.me/?text=${text}`, '_blank');
               }}
@@ -150,7 +161,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </div>
         </aside>
 
-        <main className="flex-1 p-6 md:p-10 overflow-auto custom-scrollbar">
+        <main className={`flex-1 p-6 md:p-10 overflow-auto custom-scrollbar transition-all duration-300 ${isMenuOpen ? 'md:pl-80' : 'md:pl-10'}`}>
           <motion.div
             key={location.pathname}
             initial={{ opacity: 0, y: 10 }}
