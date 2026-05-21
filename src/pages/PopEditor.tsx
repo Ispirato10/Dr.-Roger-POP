@@ -483,6 +483,18 @@ export default function PopEditor() {
         const data = docSnap.data();
         console.log("POP Data correctly fetched from Firestore:", data.title);
         
+        // Parse tables safely from Firestore format to UI format: { cells: string[] }[] -> string[][]
+        const parsedTables = (data.tables || []).map((t: any) => ({
+          title: t.title || '',
+          headers: t.headers || [],
+          rows: (t.rows || []).map((row: any) => {
+            if (row && typeof row === 'object' && Array.isArray(row.cells)) {
+              return row.cells;
+            }
+            return Array.isArray(row) ? row : [];
+          })
+        }));
+
         // Ensure standard fields are populated even if missing in Firestore
         const resetData: PopFormValues = {
           title: data.title || '',
@@ -507,7 +519,7 @@ export default function PopEditor() {
           version: data.version || 1,
           images: data.images || [],
           customFields: data.customFields || [],
-          tables: data.tables || [],
+          tables: parsedTables,
         };
 
         reset(resetData);
@@ -567,8 +579,21 @@ export default function PopEditor() {
     setSaving(true);
     try {
       const now = new Date().toISOString();
+      
+      // Sanitize tables to avoid Firestore nested arrays error: string[][] -> { cells: string[] }[]
+      const safeTables = (values.tables || []).map(table => ({
+        ...table,
+        rows: (table.rows || []).map((row: any) => {
+          if (Array.isArray(row)) {
+            return { cells: row };
+          }
+          return row;
+        })
+      }));
+
       const popData = {
         ...values,
+        tables: safeTables,
         drugstoreId: drugstore.id,
         ownerId: drugstore.id,
         authorId: user.uid,

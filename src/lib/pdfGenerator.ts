@@ -86,7 +86,17 @@ export const generatePopPDF = async (data: any, drugstore: any) => {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12); // Standard ABNT size for titles and section lines
     doc.setTextColor(30, 58, 138); // deep blue text
-    doc.text(titleText, 15, currentY);
+    
+    // Split title to fit within margins
+    const lines = doc.splitTextToSize(titleText, 180);
+    for (let i = 0; i < lines.length; i++) {
+      doc.text(lines[i], 15, currentY);
+      if (i < lines.length - 1) {
+        currentY += 5.5;
+        checkPageOverflow(14);
+      }
+    }
+    
     doc.setDrawColor(219, 234, 254);
     doc.setLineWidth(0.2);
     doc.line(15, currentY + 1.8, 195, currentY + 1.8);
@@ -145,7 +155,15 @@ export const generatePopPDF = async (data: any, drugstore: any) => {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(12); // Standard ABNT size for subtitles
       doc.setTextColor(15, 23, 42);
-      doc.text(tag.label, 15, currentY);
+      
+      const subTitleLines = doc.splitTextToSize(tag.label, 180);
+      for (let i = 0; i < subTitleLines.length; i++) {
+        doc.text(subTitleLines[i], 15, currentY);
+        if (i < subTitleLines.length - 1) {
+          currentY += 5.5;
+          checkPageOverflow(18);
+        }
+      }
 
       doc.setDrawColor(37, 99, 235);
       doc.setLineWidth(0.8);

@@ -21,6 +21,20 @@ import {
 import { format } from 'date-fns';
 import { POP_TEMPLATES } from '../constants/templates';
 
+// Helper function to sanitize any nested arrays within tables before saving to Firestore
+const sanitizeTablesForFirestore = (tables?: any[]) => {
+  if (!tables) return [];
+  return tables.map(table => ({
+    ...table,
+    rows: (table.rows || []).map((row: any) => {
+      if (Array.isArray(row)) {
+        return { cells: row };
+      }
+      return row;
+    })
+  }));
+};
+
 export default function Dashboard() {
   const { drugstore, user } = useAuth();
   const [stats, setStats] = React.useState({
@@ -55,6 +69,13 @@ export default function Dashboard() {
       for (const template of POP_TEMPLATES) {
         const templateCode = template.code.trim();
         const existing = existingPopsMap[templateCode];
+        const { id: templateId, ...templateData } = template;
+        
+        // Sanitize tables to avoid Firestore nested arrays error: string[][] -> { cells: string[] }[]
+        const sanitizedTemplateData = {
+          ...templateData,
+          tables: sanitizeTablesForFirestore(templateData.tables)
+        };
         
         if (existing) {
           // If existing is empty or significantly shorter than template, update it
@@ -62,18 +83,16 @@ export default function Dashboard() {
           const templateProcedureLength = template.procedure.length;
           
           if (existingProcedureLength < templateProcedureLength * 0.8) {
-            const { id: templateId, ...templateData } = template;
             await updateDoc(doc(db, 'pops', existing.id), {
-              ...templateData,
+              ...sanitizedTemplateData,
               updatedAt: new Date().toISOString(),
               version: (existing.version || 1) + 1
             });
             updated++;
           }
         } else {
-          const { id: templateId, ...templateData } = template;
           await addDoc(collection(db, 'pops'), {
-            ...templateData,
+            ...sanitizedTemplateData,
             drugstoreId: drugstore.id,
             ownerId: drugstore.id,
             status: 'active',
@@ -206,16 +225,22 @@ export default function Dashboard() {
           const existing = existingPopsMap[templateCode];
           const { id: templateId, ...templateData } = template;
 
+          // Sanitize tables to avoid Firestore nested arrays error
+          const sanitizedTemplateData = {
+            ...templateData,
+            tables: sanitizeTablesForFirestore(templateData.tables)
+          };
+
           if (existing) {
             await updateDoc(doc(db, 'pops', existing.id), {
-              ...templateData,
+              ...sanitizedTemplateData,
               updatedAt: new Date().toISOString(),
               version: (existing.version || 1) + 1
             });
             console.log("INTERNAL: Auto-synced and upgraded existing POP 12!");
           } else {
             await addDoc(collection(db, 'pops'), {
-              ...templateData,
+              ...sanitizedTemplateData,
               drugstoreId: drugstore.id,
               ownerId: drugstore.id,
               status: 'active',
