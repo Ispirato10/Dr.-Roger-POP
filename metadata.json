@@ -1,6 +1,6 @@
 {
-  "name": "Dr. Roger POP",
-  "description": "Sistema completo para gestão de Procedimentos Operacionais Padrão (POP) para drogarias e farmácias.",
+  "name": "Dr. Roger - Gestor de POPs Farmacêuticos",
+  "description": "Plataforma profissional para criação, edição, visualização e gestão de Procedimentos Operacionais Padrão (POP) para drogarias e farmácias, com visualizador estilo SodaPDF.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="800" height="500">
+  <!-- Background -->
+  <rect width="800" height="500" fill="#D7EDFF" stroke="#006699" stroke-width="4" rx="8"/>
+  
+  <!-- Outer border outline -->
+  <rect x="15" y="15" width="770" height="470" fill="none" stroke="#003366" stroke-width="1.5" rx="4"/>
+
+  <!-- Top Divider line -->
+  <line x1="15" y1="90" x2="785" y2="90" stroke="#003366" stroke-width="1.5"/>
+
+  <!-- Top section grid -->
+  <!-- NOTIFICACAO DE RECEITA -->
+  <rect x="15" y="15" width="220" height="75" fill="none" stroke="#003366" stroke-width="1.5"/>
+  <text x="125" y="40" font-family="'Courier New', monospace, sans-serif" font-size="13" font-weight="bold" fill="#000000" text-anchor="middle">NOTIFICAÇÃO DE RECEITA B</text>
+  <text x="125" y="60" font-family="'Courier New', monospace, sans-serif" font-size="11" fill="#000000" text-anchor="middle">PORTARIA 344/98 - SVS/MS</text>
+  <text x="210" y="42" font-family="'Courier New', monospace, sans-serif" font-size="28" font-weight="black" fill="#000000">B</text>
+
+  <!-- IDENTIFICACAO DO EMITENTE -->
+  <text x="250" y="32" font-family="'Courier New', monospace, sans-serif" font-size="10" font-weight="bold" fill="#000000">IDENTIFICAÇÃO DO EMITENTE:</text>
+  <line x1="250" y1="45" x2="770" y2="45" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="250" y="42" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">Nome do Profissional Prescritor:</text>
+  
+  <line x1="250" y1="62" x2="550" y2="62" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="250" y="59" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">CRM/CRO:</text>
+  <text x="400" y="59" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">UF:</text>
+
+  <line x1="560" y1="62" x2="770" y2="62" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="560" y="59" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">Inscrição Regional:</text>
+
+  <line x1="250" y1="78" x2="770" y2="78" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="250" y="75" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">Endereço do Consultório / Estabelecimento:</text>
+
+  <!-- Middle section divider -->
+  <line x1="15" y1="210" x2="785" y2="210" stroke="#003366" stroke-width="1.5"/>
+  <line x1="450" y1="90" x2="450" y2="210" stroke="#003366" stroke-width="1.5"/>
+
+  <!-- Left block of Middle (Paciente & Meds) -->
+  <text x="25" y="110" font-family="'Courier New', monospace, sans-serif" font-size="10" font-weight="bold" fill="#000000">PACIENTE:</text>
+  <line x1="25" y1="132" x2="435" y2="132" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="25" y="127" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">Nome:</text>
+
+  <line x1="25" y1="155" x2="435" y2="155" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="25" y="150" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">Endereço Residencial:</text>
+
+  <text x="25" y="178" font-family="'Courier New', monospace, sans-serif" font-size="10" font-weight="bold" fill="#000000">MEDICAMENTO OU SUBSTÂNCIA:</text>
+  <line x1="25" y1="198" x2="435" y2="198" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="25" y="194" font-family="'Courier New', monospace, sans-serif" font-size="8" fill="#004488">Apenas um medicamento de uso psicanalítico:</text>
+
+  <!-- Right block of Middle (Dose por Unidade & Posologia) -->
+  <text x="460" y="110" font-family="'Courier New', monospace, sans-serif" font-size="10" font-weight="bold" fill="#000000">DOSE POR UNIDADE POSOLÓGICA:</text>
+  <line x1="460" y1="140" x2="770" y2="140" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="460" y="132" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">Quantidade / Concentração:</text>
+
+  <text x="460" y="165" font-family="'Courier New', monospace, sans-serif" font-size="10" font-weight="bold" fill="#000000">POSOLOGIA / QUANTIDADE TOTAL:</text>
+  <line x1="460" y1="195" x2="770" y2="195" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="460" y="188" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">Tempo total de tratamento (máximo 60 dias):</text>
+
+  <!-- Bottom section divider -->
+  <line x1="15" y1="380" x2="785" y2="380" stroke="#003366" stroke-width="1.5"/>
+  <line x1="450" y1="210" x2="450" y2="380" stroke="#003366" stroke-width="1.5"/>
+
+  <!-- Bottom Left: IDENTIFICACAO DO COMPRADOR -->
+  <text x="25" y="230" font-family="'Courier New', monospace, sans-serif" font-size="10" font-weight="bold" fill="#000000">IDENTIFICAÇÃO DO COMPRADOR:</text>
+  
+  <line x1="25" y1="258" x2="435" y2="258" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="25" y="253" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">Nome completo do comprador:</text>
+
+  <line x1="25" y1="288" x2="330" y2="288" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="25" y="283" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">Doc. Identidade (RG):</text>
+  
+  <line x1="340" y1="288" x2="435" y2="288" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="340" y="283" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">Órgão Emissor:</text>
+
+  <line x1="25" y1="318" x2="435" y2="318" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="25" y="313" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">Endereço atualizado do comprador:</text>
+
+  <line x1="25" y1="348" x2="250" y2="348" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="25" y="343" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">Telefone para contato:</text>
+
+  <line x1="260" y1="348" x2="435" y2="348" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="260" y="343" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">Cidade / Estado (UF):</text>
+
+  <!-- Bottom Right: CARIMBO DO FORNECEDOR / ASSINATURA -->
+  <text x="460" y="230" font-family="'Courier New', monospace, sans-serif" font-size="10" font-weight="bold" fill="#000000">CARIMBO DO FORNECEDOR (DE DISPENSAÇÃO):</text>
+  
+  <line x1="460" y1="262" x2="770" y2="262" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="460" y="255" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">Nome da Farmácia UBS Central:</text>
+
+  <line x1="460" y1="305" x2="600" y2="305" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="460" y="298" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">Nome do vendedor/responsável:</text>
+
+  <line x1="615" y1="305" x2="770" y2="305" stroke="#003366" stroke-width="0.75" stroke-dasharray="2,2"/>
+  <text x="615" y="298" font-family="'Courier New', monospace, sans-serif" font-size="9" fill="#004488">Data da Dispensação:</text>
+
+  <!-- Signatures Line -->
+  <line x1="460" y1="355" x2="770" y2="355" stroke="#003366" stroke-width="1"/>
+  <text x="615" y="367" font-family="'Courier New', monospace, sans-serif" font-size="8.5" fill="#003366" text-anchor="middle">Assinatura do Farmacêutico / carimbo</text>
+
+  <!-- Gráfica Footer text -->
+  <text x="25" y="420" font-family="sans-serif" font-size="7.5" fill="#003366">DADOS DA GRÁFICA AUTORIZADA: Artes Gráficas Rio Bom S/A - CNPJ 12.345.678/0001-90 - Autorização Vigilância Sanitária No. 543/2022 - PR</text>
+  <text x="25" y="440" font-family="sans-serif" font-size="7.5" fill="#003366">Validade estrita de 30 dias após emissão. Legítima somente nesta Unidade Federativa.</text>
+  
+  <text x="770" y="460" font-family="monospace, sans-serif" font-size="12" font-weight="bold" fill="#000000" text-anchor="end">Série B - No. 049582</text>
+</svg>

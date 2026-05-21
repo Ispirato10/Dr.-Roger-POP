@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { collection, query, where, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { collection, query, where, getDocs, onSnapshot, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Link, useSearchParams } from 'react-router-dom';
 import { 
   FileText, 
@@ -36,23 +36,23 @@ export default function PopList() {
     }
   }, [queryParam]);
 
-  const fetchPops = async () => {
+  React.useEffect(() => {
     if (!drugstore) return;
+    
     setLoading(true);
-    try {
-      const q = query(collection(db, 'pops'), where('drugstoreId', '==', drugstore.id));
-      const snapshot = await getDocs(q);
+    const q = query(collection(db, 'pops'), where('drugstoreId', '==', drugstore.id));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       setPops(docs);
-    } catch (error) {
-      console.error("Error fetching pops:", error);
-    } finally {
       setLoading(false);
-    }
-  };
+    }, (error) => {
+      console.error("Pops list snapshot error:", error);
+      handleFirestoreError(error, OperationType.LIST, 'pops');
+      setLoading(false);
+    });
 
-  React.useEffect(() => {
-    fetchPops();
+    return () => unsubscribe();
   }, [drugstore]);
 
   const [isDeleting, setIsDeleting] = React.useState<string | null>(null);
@@ -69,15 +69,13 @@ export default function PopList() {
 
     setConfirmDelete(null);
     setIsDeleting(id);
-    const previousPops = [...pops];
-    setPops(prev => prev.filter(p => p.id !== id));
 
     try {
       await deleteDoc(doc(db, 'pops', id));
     } catch (error: any) {
-      console.error("Error deleting POP:", error);
-      setPops(previousPops);
-      alert(`Erro ao excluir: ${error.message}`);
+      console.error("Error deleting:", error);
+      alert(`Erro ao excluir: ${error.message || 'Sem permissão'}`);
+      handleFirestoreError(error, OperationType.DELETE, `pops/${id}`);
     } finally {
       setIsDeleting(null);
     }
@@ -98,10 +96,12 @@ export default function PopList() {
           <h1 className="text-3xl font-black text-slate-900 leading-none tracking-tight">Biblioteca de POPs</h1>
           <p className="text-sm text-slate-500 mt-2 font-medium tracking-tight">Gerencie todos os procedimentos operacionais e normativos da sua drogaria.</p>
         </div>
-        <Link to="/pops/new" className="btn-primary flex items-center space-x-2 self-start md:self-auto group">
-          <Plus size={20} className="group-hover:rotate-90 transition-transform duration-300" />
-          <span>Novo Documento</span>
-        </Link>
+        <div className="flex items-center gap-3 self-start md:self-auto">
+          <Link to="/pops/new" className="btn-primary flex items-center space-x-2 group">
+            <Plus size={20} className="group-hover:rotate-90 transition-transform duration-300" />
+            <span>Novo Documento</span>
+          </Link>
+        </div>
       </div>
 
       <div className="card border-none shadow-xl shadow-slate-200/50 p-8 space-y-8">
@@ -159,9 +159,12 @@ export default function PopList() {
                             {pop.code}
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-sm font-black text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors uppercase leading-tight">
+                            <Link 
+                              to={`/pops/edit/${pop.id}`}
+                              className="text-sm font-black text-slate-900 tracking-tight hover:text-blue-600 transition-colors uppercase leading-tight"
+                            >
                               {pop.title}
-                            </span>
+                            </Link>
                             <span className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">Versão v{pop.version}.0</span>
                           </div>
                         </div>
@@ -182,6 +185,13 @@ export default function PopList() {
                       </td>
                       <td className="px-8 py-6 text-right">
                         <div className="flex items-center justify-end gap-3">
+                          <Link 
+                            to={`/pops/edit/${pop.id}?mode=preview`}
+                            className="w-10 h-10 flex items-center justify-center bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm"
+                            title="Visualizar Documento"
+                          >
+                            <Eye size={16} />
+                          </Link>
                           <Link 
                             to={`/pops/edit/${pop.id}`}
                             className="w-10 h-10 flex items-center justify-center bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"

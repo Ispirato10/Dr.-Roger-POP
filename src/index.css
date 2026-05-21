@@ -71,3 +71,86 @@
   }
 }
 
+/* HIGH FIDELITY PRINT MEDIA STYLES - Guaranteeing perfect PDF copies matching visualizer */
+@media print {
+  /* Hide every normal element on the screen */
+  body, html, #root, .min-h-screen, .flex {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  /* Expose ONLY the specific document printable area */
+  .print-document-area, .print-document-area * {
+    visibility: visible;
+  }
+
+  .print-document-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 210mm !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+    background: transparent !important;
+  }
+
+  /* Style each printable sheet to strictly map onto physical A4 paper size */
+  .print-page-box {
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    outline: none !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    display: block !important;
+    position: relative !important;
+    transform: none !important;
+    flex-shrink: 0 !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    background: white !important;
+  }
+
+  .print-page-content {
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
+    padding: 15mm !important;
+    transform: none !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    outline: none !important;
+    background: white !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Force background colors and background graphic printing */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  @page {
+    size: A4 portrait !important;
+    margin: 0 !important;
+  }
+}
+
+

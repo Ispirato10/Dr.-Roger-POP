@@ -1,11 +1,11 @@
 import React from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '../contexts/AuthContext';
-import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, updateDoc, collection, addDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
   ArrowLeft, 
   Save, 
@@ -19,6 +19,7 @@ import {
   ShieldCheck, 
   Loader2,
   BookOpen,
+  Eye,
   User,
   Package,
   ListOrdered,
@@ -37,6 +38,8 @@ import { format } from 'date-fns';
 import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, ImageRun, Table, TableRow, TableCell, WidthType, BorderStyle, VerticalAlign } from 'docx';
 import { useFieldArray } from 'react-hook-form';
 import { saveAs } from 'file-saver';
+import PopVisualizer from '../components/PopVisualizer';
+import { generatePopPDF } from '../lib/pdfGenerator';
 
 const popSchema = z.object({
   title: z.string().min(3, "Título obrigatório"),
@@ -44,6 +47,10 @@ const popSchema = z.object({
   objective: z.string().min(5, "Objetivo obrigatório"),
   applicationField: z.string().min(3, "Campo de aplicação obrigatório"),
   definitions: z.string().optional(),
+  siglas: z.string().optional(),
+  elaboradoPor: z.string().optional(),
+  revisadoPor: z.string().optional(),
+  anoRevisao: z.string().optional(),
   responsible: z.string().min(2, "Responsável obrigatório"),
   materials: z.string().optional(),
   epi: z.string().optional(),
@@ -52,6 +59,7 @@ const popSchema = z.object({
   monitoring: z.string().optional(),
   reviewFrequency: z.string().optional(),
   references: z.string().optional(),
+  category: z.string().optional(),
   status: z.enum(['draft', 'active', 'archived']),
   version: z.number(),
   images: z.array(z.object({
@@ -62,17 +70,108 @@ const popSchema = z.object({
     label: z.string(),
     value: z.string(),
   })).optional(),
+  tables: z.array(z.object({
+    title: z.string().optional(),
+    headers: z.array(z.string()),
+    rows: z.array(z.array(z.string())),
+  })).optional(),
 });
 
 type PopFormValues = z.infer<typeof popSchema>;
 
+// Helper functions to parse and convert oklab() and oklch() color models to fallback standard rgb()/rgba() colors.
+// This is necessary because html2canvas's layout rendering engine does not have native support for parsing oklch/oklab.
+function parseOklabOrOklch(colorStr: string): string {
+  const isOklch = colorStr.toLowerCase().startsWith('oklch');
+  const isOklab = colorStr.toLowerCase().startsWith('oklab');
+  if (!isOklch && !isOklab) return colorStr;
+
+  const match = colorStr.match(/\(([^)]+)\)/);
+  if (!match) return colorStr;
+
+  const content = match[1].trim();
+  const cleanContent = content.replace(/\//g, ' ').replace(/,/g, ' ').replace(/\s+/g, ' ');
+  const parts = cleanContent.split(' ');
+
+  if (parts.length < 3) return colorStr;
+
+  const L = parseFloat(parts[0]);
+  let a = 0;
+  let b = 0;
+  let alpha = '1';
+
+  if (isOklch) {
+    const C = parseFloat(parts[1]);
+    const H = parseFloat(parts[2]);
+    a = C * Math.cos((H * Math.PI) / 180);
+    b = C * Math.sin((H * Math.PI) / 180);
+  } else {
+    a = parseFloat(parts[1]);
+    b = parseFloat(parts[2]);
+  }
+
+  if (parts.length >= 4) {
+    let rawAlpha = parts[3];
+    if (rawAlpha.endsWith('%')) {
+      alpha = (parseFloat(rawAlpha) / 100).toString();
+    } else {
+      alpha = rawAlpha;
+    }
+  }
+
+  // Oklab to linear sRGB
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+
+  const l = l_ * l_ * l_;
+  const m = m_ * m_ * m_;
+  const s = s_ * s_ * s_;
+
+  const r = +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+  const g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+  const b_val = -0.0041960863 * l - 0.7034186145 * m + 1.7076147010 * s;
+
+  const lrgb2srgb = (c: number): number => {
+    const abs = Math.abs(c);
+    const res = abs > 0.0031308 ? 1.055 * Math.pow(abs, 1 / 2.4) - 0.055 : 12.92 * abs;
+    return Math.min(255, Math.max(0, Math.round((c < 0 ? -res : res) * 255)));
+  };
+
+  const R = lrgb2srgb(r);
+  const G = lrgb2srgb(g);
+  const B = lrgb2srgb(b_val);
+
+  return parseFloat(alpha) === 1 ? `rgb(${R}, ${G}, ${B})` : `rgba(${R}, ${G}, ${B}, ${alpha})`;
+}
+
+function replaceOklabAndOklchInString(str: string): string {
+  if (typeof str !== 'string') return str;
+  if (!str.includes('oklch') && !str.includes('oklab')) return str;
+
+  return str.replace(/(oklch|oklab)\(([^)]+)\)/gi, (match) => {
+    try {
+      return parseOklabOrOklch(match);
+    } catch (e) {
+      console.warn("Failed standard conversion: fallback to solid color", e);
+      return 'rgb(59, 130, 246)';
+    }
+  });
+}
+
 export default function PopEditor() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const initialMode = searchParams.get('mode') === 'preview' ? 'preview' : 'edit';
+  
   const navigate = useNavigate();
   const { drugstore, user } = useAuth();
   const [loading, setLoading] = React.useState(!!id);
   const [saving, setSaving] = React.useState(false);
   const [showTemplates, setShowTemplates] = React.useState(!id);
+  const [viewMode, setViewMode] = React.useState<'edit' | 'preview'>(initialMode);
+  const [isExportingPDF, setIsExportingPDF] = React.useState(false);
+  const [exportStep, setExportStep] = React.useState('');
 
   const { register, handleSubmit, reset, setValue, watch, control, formState: { errors } } = useForm<PopFormValues>({
     resolver: zodResolver(popSchema),
@@ -87,6 +186,7 @@ export default function PopEditor() {
       version: 1,
       images: [],
       customFields: [],
+      tables: [],
     }
   });
 
@@ -98,6 +198,11 @@ export default function PopEditor() {
   const { fields: customFieldItems, append: appendCustomField, remove: removeCustomField } = useFieldArray({
     control,
     name: "customFields"
+  });
+
+  const { fields: tableFields, append: appendTable, remove: removeTable } = useFieldArray({
+    control,
+    name: "tables"
   });
 
   const currentValues = watch();
@@ -194,16 +299,19 @@ export default function PopEditor() {
 
     const standardSections = [
       { label: "1. OBJETIVO", value: currentValues.objective },
-      { label: "2. CAMPO DE APLICAÇÃO", value: currentValues.applicationField },
-      { label: "3. DEFINIÇÕES", value: currentValues.definitions },
-      { label: "4. RESPONSÁVEL", value: currentValues.responsible },
-      { label: "5. MATERIAIS NECESSÁRIOS", value: currentValues.materials },
-      { label: "6. EQUIPAMENTOS DE PROTEÇÃO (EPI)", value: currentValues.epi },
-      { label: "7. RISCOS DA ATIVIDADE", value: currentValues.riscos },
-      { label: "8. PROCEDIMENTO DETALHADO", value: currentValues.procedure },
-      { label: "9. MONITORAMENTO E VERIFICAÇÃO", value: currentValues.monitoring },
-      { label: "10. FREQUÊNCIA DE REVISÃO", value: currentValues.reviewFrequency },
-      { label: "11. REFERÊNCIAS NORMATIVAS", value: currentValues.references },
+      { label: "2. SIGLAS", value: currentValues.siglas },
+      { label: "3. CAMPO DE APLICAÇÃO", value: currentValues.applicationField },
+      { label: "4. DEFINIÇÕES", value: currentValues.definitions },
+      { label: "5. RESPONSÁVEL", value: currentValues.responsible },
+      { label: "6. ELABORADO POR", value: currentValues.elaboradoPor },
+      { label: "7. REVISADO POR", value: currentValues.revisadoPor },
+      { label: "8. MATERIAIS NECESSÁRIOS", value: currentValues.materials },
+      { label: "9. EQUIPAMENTOS DE PROTEÇÃO (EPI)", value: currentValues.epi },
+      { label: "10. RISCOS DA ATIVIDADE", value: currentValues.riscos },
+      { label: "11. PROCEDIMENTO DETALHADO", value: currentValues.procedure },
+      { label: "12. MONITORAMENTO E VERIFICAÇÃO", value: currentValues.monitoring },
+      { label: "13. FREQUÊNCIA DE REVISÃO", value: currentValues.reviewFrequency },
+      { label: "14. REFERÊNCIAS NORMATIVAS", value: currentValues.references },
     ];
 
     standardSections.forEach(section => {
@@ -229,7 +337,7 @@ export default function PopEditor() {
     // Add Custom Fields to DOCX
     if (currentValues.customFields && currentValues.customFields.length > 0) {
       children.push(new Paragraph({
-        children: [new TextRun({ text: "12. INFORMAÇÕES ADICIONAIS", bold: true, size: 22 })],
+        children: [new TextRun({ text: "9. INFORMAÇÕES ADICIONAIS", bold: true, size: 22 })],
         spacing: { before: 300, after: 100 },
         shading: { fill: "F2F2F2" },
       }));
@@ -242,6 +350,37 @@ export default function PopEditor() {
           spacing: { after: 100 },
           alignment: AlignmentType.LEFT,
         }));
+      });
+    }
+
+    // Add Tables to DOCX
+    if (currentValues.tables && currentValues.tables.length > 0) {
+      currentValues.tables.forEach(tableData => {
+        if (tableData.title) {
+          children.push(new Paragraph({
+            children: [new TextRun({ text: tableData.title.toUpperCase(), bold: true, size: 20 })],
+            spacing: { before: 200, after: 100 }
+          }));
+        }
+
+        const table = new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [
+            new TableRow({
+              children: tableData.headers.map(h => new TableCell({
+                children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })], alignment: AlignmentType.CENTER })],
+                shading: { fill: "F2F2F2" }
+              }))
+            }),
+            ...tableData.rows.map(row => new TableRow({
+              children: row.map(cell => new TableCell({
+                children: [new Paragraph({ text: cell, alignment: AlignmentType.CENTER })]
+              }))
+            }))
+          ]
+        });
+        children.push(table);
+        children.push(new Paragraph({ text: "", spacing: { after: 200 } }));
       });
     }
 
@@ -332,17 +471,59 @@ export default function PopEditor() {
     saveAs(blob, `${currentValues.code || "POP"}_${currentValues.title}.docx`);
   };
 
+
   const fetchPop = async () => {
     if (!id) return;
+    setLoading(true);
+    console.log("Fetching POP:", id);
     try {
-      const docSnap = await getDoc(doc(db, 'pops', id));
+      const docRef = doc(db, 'pops', id);
+      const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
-        reset(docSnap.data() as PopFormValues);
+        const data = docSnap.data();
+        console.log("POP Data correctly fetched from Firestore:", data.title);
+        
+        // Ensure standard fields are populated even if missing in Firestore
+        const resetData: PopFormValues = {
+          title: data.title || '',
+          code: data.code || '',
+          objective: data.objective || '',
+          applicationField: data.applicationField || '',
+          definitions: data.definitions || '',
+          siglas: data.siglas || '',
+          elaboradoPor: data.elaboradoPor || '',
+          revisadoPor: data.revisadoPor || '',
+          anoRevisao: data.anoRevisao || '',
+          responsible: data.responsible || '',
+          materials: data.materials || '',
+          epi: data.epi || '',
+          riscos: data.riscos || '',
+          procedure: data.procedure || '',
+          monitoring: data.monitoring || '',
+          reviewFrequency: data.reviewFrequency || 'Anual',
+          references: data.references || '',
+          category: data.category || 'GERAL',
+          status: data.status || 'draft',
+          version: data.version || 1,
+          images: data.images || [],
+          customFields: data.customFields || [],
+          tables: data.tables || [],
+        };
+
+        reset(resetData);
+        // Force manual check for title after reset
+        if (!resetData.title) console.warn("Attention: POP title is empty in the database document!");
+      } else {
+        console.error("POP document not found in Firestore:", id);
+        alert("Documento não encontrado. Ele pode ter sido excluído.");
+        navigate('/pops');
       }
     } catch (error) {
-      console.error("Error fetching pop:", error);
+      console.error("Error fetching POP:", error);
+      handleFirestoreError(error, OperationType.GET, `pops/${id}`);
     } finally {
-      setLoading(false);
+      // Small delay to ensure React Hook Form has applied the changes
+      setTimeout(() => setLoading(false), 100);
     }
   };
 
@@ -350,11 +531,21 @@ export default function PopEditor() {
     if (id) fetchPop();
   }, [id]);
 
+  React.useEffect(() => {
+    const mode = searchParams.get('mode');
+    if (mode === 'preview') setViewMode('preview');
+    else setViewMode('edit');
+  }, [searchParams]);
+
   const applyTemplate = (template: POPTemplate) => {
     setValue('title', template.title);
     setValue('objective', template.objective);
     setValue('applicationField', template.applicationField || 'Toda a drogaria');
     setValue('definitions', template.definitions || '-');
+    setValue('siglas', template.siglas || '');
+    setValue('elaboradoPor', drugstore?.name || '');
+    setValue('revisadoPor', '');
+    setValue('anoRevisao', new Date().getFullYear().toString());
     setValue('responsible', template.responsible);
     setValue('materials', template.materials);
     setValue('epi', template.epi || 'Avental branco, identificação.');
@@ -363,9 +554,11 @@ export default function PopEditor() {
     setValue('monitoring', template.monitoring || '-');
     setValue('reviewFrequency', template.reviewFrequency || 'Anual');
     setValue('references', template.references);
-    setValue('code', `POP-${template.id.toUpperCase().substring(0, 4)}-01`);
-    setValue('images', []);
+    setValue('category', template.category || 'GERAL');
+    setValue('code', template.code || `POP-${template.id.toUpperCase().substring(0, 4)}-01`);
+    setValue('images', template.images || []);
     setValue('customFields', []);
+    setValue('tables', template.tables || []);
     setShowTemplates(false);
   };
 
@@ -377,6 +570,7 @@ export default function PopEditor() {
       const popData = {
         ...values,
         drugstoreId: drugstore.id,
+        ownerId: drugstore.id,
         authorId: user.uid,
         updatedAt: now,
       };
@@ -390,10 +584,8 @@ export default function PopEditor() {
         });
         navigate(`/pops/edit/${newDocRef.id}`);
       }
-      alert('POP salvo com sucesso!');
-    } catch (error) {
-      console.error("Error saving pop:", error);
-      alert('Erro ao salvar POP.');
+    } catch (error: any) {
+      handleFirestoreError(error, OperationType.WRITE, id ? `pops/${id}` : 'pops');
     } finally {
       setSaving(false);
     }
@@ -414,235 +606,32 @@ export default function PopEditor() {
     setConfirmDelete(false);
     try {
       await deleteDoc(doc(db, 'pops', id));
-      alert('POP excluído com sucesso!');
       navigate('/pops');
     } catch (error: any) {
-      console.error("Error deleting pop:", error);
-      alert(`Erro ao excluir POP: ${error.message || 'Erro de permissão'}`);
+      console.error("Error deleting:", error);
+      alert(`Erro ao excluir: ${error.message || 'Sem permissão'}`);
+      handleFirestoreError(error, OperationType.DELETE, `pops/${id}`);
     } finally {
       setDeleting(false);
     }
   };
 
-  const generatePDF = () => {
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 15;
-    let y = 15;
-
-    // Professional Header Table
-    autoTable(doc, {
-      startY: 10,
-      margin: { left: 10, right: 10 },
-      styles: { 
-        fontSize: 10, 
-        cellPadding: 3, 
-        lineColor: [0, 0, 0], 
-        lineWidth: 0.1,
-        valign: 'middle'
-      },
-      columnStyles: {
-        0: { cellWidth: 40, halign: 'center' }, // Logo area
-        1: { cellWidth: 'auto', halign: 'center', fontStyle: 'bold', fontSize: 13 }, // Title
-        2: { cellWidth: 45, fontSize: 8 } // Document control
-      },
-      body: [
-        [
-          { content: '', rowSpan: 2 }, // Empty for logo drawing
-          { content: 'PROCEDIMENTO OPERACIONAL PADRÃO (POP)', styles: { fillColor: [245, 245, 245] } },
-          { content: `CÓDIGO: ${currentValues.code || 'POP-XXX'}\nVERSÃO: ${currentValues.version}.0\nREVISÃO: ${format(new Date(), 'dd/MM/yyyy')}` }
-        ],
-        [
-          { content: currentValues.title?.toUpperCase() || 'SEM TÍTULO' },
-          { content: `PÁGINA: 1 de 1` } // Placeholder, updated in footer
-        ]
-      ],
-      didDrawCell: (data) => {
-        if (data.section === 'body' && data.column.index === 0 && data.row.index === 0) {
-          const centerX = data.cell.x + data.cell.width / 2;
-          const centerY = data.cell.y + data.cell.height / 2;
-          
-          if (drugstore?.logoUrl) {
-            try {
-              // Calculate dimensions to fit in the cell while maintaining aspect ratio
-              // Cell is 40mm wide (columnStyles 0)
-              const imgWidth = 30; // 30mm width
-              const imgHeight = 20; // max 20mm height
-              doc.addImage(drugstore.logoUrl, 'PNG', centerX - (imgWidth / 2), centerY - (imgHeight / 2), imgWidth, imgHeight, undefined, 'FAST');
-            } catch (e) {
-              console.error("Error drawing custom logo:", e);
-              // Fallback to text if image fails
-              doc.setFontSize(8);
-              doc.setTextColor(100);
-              doc.text(drugstore.name || 'DROGARIA', centerX, centerY, { align: 'center' });
-            }
-          } else {
-            // Sky Blue Professional Logo (Fallback if no custom logo)
-            doc.setDrawColor(3, 105, 161); // sky-700
-            doc.setLineWidth(1.2);
-            doc.line(centerX - 4, centerY, centerX + 4, centerY);
-            doc.line(centerX, centerY - 4, centerX, centerY + 4);
-            
-            doc.setLineWidth(0.6);
-            doc.circle(centerX, centerY, 8, 'S');
-  
-            doc.setFontSize(5);
-            doc.setTextColor(3, 105, 161);
-            doc.setFont('helvetica', 'bold');
-            doc.text('QUALIDADE', centerX, centerY + 11, { align: 'center' });
-          }
-        }
-      },
-      theme: 'grid'
-    });
-
-    const headerFinalY = (doc as any).lastAutoTable.finalY + 10;
-    y = headerFinalY;
-
-    // Content
-    const sections = [
-      { label: '1. OBJETIVO', value: currentValues.objective },
-      { label: '2. CAMPO DE APLICAÇÃO', value: currentValues.applicationField },
-      { label: '3. DEFINIÇÕES', value: currentValues.definitions },
-      { label: '4. RESPONSÁVEL', value: currentValues.responsible },
-      { label: '5. MATERIAIS NECESSÁRIOS', value: currentValues.materials },
-      { label: '6. EQUIPAMENTOS DE PROTEÇÃO (EPI)', value: currentValues.epi },
-      { label: '7. RISCOS DA ATIVIDADE', value: currentValues.riscos },
-      { label: '8. PROCEDIMENTO DETALHADO', value: currentValues.procedure },
-      { label: '9. MONITORAMENTO E VERIFICAÇÃO', value: currentValues.monitoring },
-      { label: '10. FREQUÊNCIA DE REVISÃO', value: currentValues.reviewFrequency },
-      { label: '11. REFERÊNCIAS NORMATIVAS', value: currentValues.references },
-    ];
-
-    sections.forEach(section => {
-      const splitValue = doc.splitTextToSize(section.value || '-', pageWidth - margin * 2);
-      const estimatedHeight = 15 + (splitValue.length * 5);
-      
-      if (y + estimatedHeight > 270) {
-        doc.addPage();
-        y = 20;
-      }
-
-      autoTable(doc, {
-        startY: y,
-        margin: { left: margin, right: margin },
-        styles: { fontSize: 10, cellPadding: 1, overflow: 'linebreak' },
-        headStyles: { fontSize: 11, fontStyle: 'bold', fillColor: [255, 255, 255], textColor: [0, 0, 0] },
-        body: [
-          [{ 
-            content: section.label, 
-            styles: { fontStyle: 'bold', fontSize: 11, cellPadding: { bottom: 2 }, halign: 'left' as const } 
-          }],
-          [{ 
-            content: section.value || '-',
-            styles: { halign: 'left' as const }
-          }]
-        ],
-        theme: 'plain'
-      });
-      
-      y = (doc as any).lastAutoTable.finalY + 8;
-    });
-
-    // Custom Fields in PDF
-    if (currentValues.customFields && currentValues.customFields.length > 0) {
-      if (y > 250) { doc.addPage(); y = 20; }
-      
-      autoTable(doc, {
-        startY: y,
-        margin: { left: margin, right: margin },
-        styles: { fontSize: 10, cellPadding: 1 },
-        body: [
-          [{ 
-            content: '12. INFORMAÇÕES ADICIONAIS', 
-            styles: { fontStyle: 'bold', fontSize: 11, cellPadding: { bottom: 2 }, halign: 'left' as const } 
-          }],
-          ...currentValues.customFields.map(field => [
-            { 
-              content: `${field.label.toUpperCase()}: ${field.value}`,
-              styles: { halign: 'left' as const }
-            }
-          ])
-        ],
-        theme: 'plain'
-      });
-      
-      y = (doc as any).lastAutoTable.finalY + 8;
+  const generatePDF = async () => {
+    setIsExportingPDF(true);
+    setExportStep('Compilando vetores gráficos e imagens oficiais do POP...');
+    try {
+      const pdf = await generatePopPDF(currentValues, drugstore);
+      setExportStep('Iniciando transferência segura do arquivo...');
+      const cleanTitle = (currentValues.title || 'Procedimento').replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+      const filename = `POP_${currentValues.code || 'XXX'}_${cleanTitle}.pdf`;
+      pdf.save(filename);
+    } catch (e: any) {
+      console.error("Error generating clean vector PDF in editor:", e);
+      alert("Erro ao exportar PDF de alta fidelidade: " + e.message);
+    } finally {
+      setIsExportingPDF(false);
+      setExportStep('');
     }
-
-    // Images in PDF
-    if (currentValues.images && currentValues.images.length > 0) {
-      currentValues.images.forEach((img, idx) => {
-        if (y > 200) {
-          doc.addPage();
-          y = 20;
-        } else {
-          y += 10;
-        }
-
-        try {
-          const imgWidth = 120;
-          const imgHeight = 80;
-          const centerX = (pageWidth - imgWidth) / 2;
-          
-          doc.addImage(img.url, 'PNG', centerX, y, imgWidth, imgHeight, undefined, 'FAST');
-          y += imgHeight + 5;
-          
-          if (img.caption) {
-            doc.setFontSize(9);
-            doc.setFont('helvetica', 'italic');
-            doc.text(img.caption, pageWidth / 2, y, { align: 'center' });
-            y += 8;
-          }
-        } catch (e) {
-          console.error("Error adding image to PDF:", e);
-        }
-      });
-    }
-
-    // Approval Area
-    if (y > 230) {
-      doc.addPage();
-      y = 20;
-    } else {
-      y += 10;
-    }
-
-    autoTable(doc, {
-      startY: y,
-      margin: { left: 10, right: 10 },
-      styles: { fontSize: 8, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1 },
-      head: [[{ content: 'REGISTRO DE APROVAÇÃO', colSpan: 3, styles: { halign: 'center', fillColor: [240, 240, 240], fontStyle: 'bold' } }]],
-      body: [
-        ['ELABORADO POR:', 'VERIFICADO POR:', 'APROVADO POR:'],
-        ['\n\n_______________________\nResponsável Técnico', '\n\n_______________________\nGerência', '\n\n_______________________\nDiretoria'],
-        [`Data: ${format(new Date(), 'dd/MM/yyyy')}`, `Data: ${format(new Date(), 'dd/MM/yyyy')}`, `Data: ${format(new Date(), 'dd/MM/yyyy')}`]
-      ],
-      theme: 'grid'
-    });
-
-    // Footer with Page Numbers
-    const pageCount = doc.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      
-      // Update page number in the header if it was on the first page
-      // Actually simpler to just add footer info
-      doc.setFontSize(8);
-      doc.setTextColor(100);
-      doc.text(`Documento de Propriedade de: ${drugstore?.name || 'Drogaria'} - Proibida Reprodução Sem Autorização`, pageWidth / 2, 285, { align: 'center' });
-      doc.text(`Página ${i} de ${pageCount}`, pageWidth - 25, 285);
-      
-      // Stamp-like text
-      doc.saveGraphicsState();
-      doc.setGState(new (doc as any).GState({ opacity: 0.1 }));
-      doc.setFontSize(40);
-      doc.setTextColor(200, 200, 200);
-      doc.text('DOCUMENTO CONTROLADO', pageWidth / 2, doc.internal.pageSize.getHeight() / 2, { align: 'center', angle: 45 });
-      doc.restoreGraphicsState();
-    }
-
-    doc.save(`${currentValues.code || 'POP'}_${currentValues.title}.pdf`);
   };
 
   const [templateSearch, setTemplateSearch] = React.useState('');
@@ -667,14 +656,33 @@ export default function PopEditor() {
           </div>
           <div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-              Editor de POP
-              <span className="text-[10px] bg-blue-50 text-blue-600 font-black px-2.5 py-1 rounded-full uppercase tracking-widest border border-blue-100">Profissional</span>
+              {id ? (currentValues.title || 'Carregando...') : 'Novo POP'}
+              <span className="text-[10px] bg-blue-50 text-blue-600 font-black px-2.5 py-1 rounded-full uppercase tracking-widest border border-blue-100">Editor</span>
             </h1>
-            <p className="text-sm text-slate-400 font-bold tracking-tight uppercase mt-0.5">Gestão de qualificação e conformidade técnica</p>
+            <p className="text-sm text-slate-400 font-bold tracking-tight uppercase mt-0.5">
+              {currentValues.code ? `${currentValues.code} • ` : ''} Gestão Normativa
+            </p>
           </div>
         </div>
         
         <div className="flex items-center gap-3">
+          <div className="flex bg-slate-100 p-1 rounded-xl mr-4">
+            <button 
+              onClick={() => setViewMode('edit')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'edit' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <Edit size={14} />
+              Editor
+            </button>
+            <button 
+              onClick={() => setViewMode('preview')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'preview' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <Eye size={14} />
+              Visualizar
+            </button>
+          </div>
+
           <button onClick={() => navigate('/pops')} className="flex items-center text-slate-500 hover:text-slate-900 transition-colors text-sm font-bold tracking-tight group">
             <ArrowLeft size={18} className="mr-2 group-hover:-translate-x-1 transition-transform" />
             Voltar à Biblioteca
@@ -752,8 +760,18 @@ export default function PopEditor() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-        <div className="lg:col-span-8 space-y-8">
+      {/* PopVisualizer always mounted so that its page elements are always available in the DOM for background pdf generation */}
+      <div className={viewMode === 'preview' ? "h-[calc(100vh-120px)] min-h-[800px]" : "fixed top-[-9999px] left-[-9999px] pointer-events-none opacity-0"}>
+        <PopVisualizer 
+          data={currentValues} 
+          drugstore={drugstore} 
+          onDownloadPDF={generatePDF}
+        />
+      </div>
+
+      {viewMode !== 'preview' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+          <div className="lg:col-span-8 space-y-8">
           <div className="card shadow-xl shadow-slate-200/50 border-none p-10 space-y-10 bg-white">
             <div className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -766,6 +784,10 @@ export default function PopEditor() {
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Código Identificador</label>
                   <input {...register('code')} className="input-field bg-slate-50 border-transparent focus:bg-white font-mono font-bold" placeholder="POP-ADM-01" />
                   {errors.code && <p className="text-xs text-red-500 font-bold">{errors.code.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Categoria</label>
+                  <input {...register('category')} className="input-field bg-slate-50 border-transparent focus:bg-white font-bold" placeholder="Ex: GERAL, DISPENSAÇÃO..." />
                 </div>
               </div>
 
@@ -799,6 +821,11 @@ export default function PopEditor() {
                 <textarea {...register('definitions')} rows={2} className="input-field bg-slate-50 border-transparent focus:bg-white resize-none" placeholder="Explique siglas e termos técnicos utilizados no documento..." />
               </div>
 
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Siglas e Abreviaturas</label>
+                <textarea {...register('siglas')} rows={2} className="input-field bg-slate-50 border-transparent focus:bg-white resize-none" placeholder="Ex: SUS: Sistema Único de Saúde..." />
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none flex items-center gap-2">
@@ -806,6 +833,21 @@ export default function PopEditor() {
                   </label>
                   <input {...register('responsible')} className="input-field bg-slate-50 border-transparent focus:bg-white" placeholder="Ex: Farmacêutico RT, Auxiliar..." />
                   {errors.responsible && <p className="text-xs text-red-500 font-bold">{errors.responsible.message}</p>}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:col-span-2">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Elaborado por</label>
+                    <input {...register('elaboradoPor')} className="input-field bg-slate-50 border-transparent focus:bg-white" placeholder="Nome do autor" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Revisado por</label>
+                    <input {...register('revisadoPor')} className="input-field bg-slate-50 border-transparent focus:bg-white" placeholder="Nome do revisor" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Ano Revisão</label>
+                    <input {...register('anoRevisao')} className="input-field bg-slate-50 border-transparent focus:bg-white" placeholder="Ex: 2025" />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none flex items-center gap-2">
@@ -895,6 +937,117 @@ export default function PopEditor() {
                 </div>
               </div>
 
+              {/* Tables Section */}
+              <div className="pt-6 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-4">
+                  <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
+                    <ListOrdered size={14} /> Tabelas de Dados
+                  </label>
+                  <button 
+                    type="button"
+                    onClick={() => appendTable({ title: '', headers: ['', ''], rows: [['', '']] })}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                  >
+                    <Plus size={14} /> Adicionar Tabela
+                  </button>
+                </div>
+                
+                <div className="space-y-6">
+                  {tableFields.map((table, tableIndex) => (
+                    <div key={table.id} className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-4 relative group">
+                      <button 
+                        type="button"
+                        onClick={() => removeTable(tableIndex)}
+                        className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-red-500 transition-colors bg-white rounded-lg shadow-sm border border-slate-100"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Título da Tabela</label>
+                        <input 
+                          {...register(`tables.${tableIndex}.title` as const)} 
+                          placeholder="Ex: Tabela de Dosagem Pediátrica" 
+                          className="input-field bg-white"
+                        />
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr>
+                              {currentValues.tables?.[tableIndex]?.headers.map((_, hIdx) => (
+                                <th key={hIdx} className="p-2 border border-slate-200 min-w-[120px]">
+                                  <input 
+                                    {...register(`tables.${tableIndex}.headers.${hIdx}` as const)}
+                                    className="w-full bg-transparent border-none text-[10px] font-black uppercase text-slate-600 focus:ring-0 text-center"
+                                    placeholder={`Coluna ${hIdx + 1}`}
+                                  />
+                                </th>
+                              ))}
+                              <th className="border border-slate-200 w-8">
+                                <button 
+                                  type="button" 
+                                  onClick={() => {
+                                    const headers = [...(currentValues.tables?.[tableIndex]?.headers || [])];
+                                    headers.push('');
+                                    setValue(`tables.${tableIndex}.headers`, headers);
+                                    const rows = [...(currentValues.tables?.[tableIndex]?.rows || [])];
+                                    setValue(`tables.${tableIndex}.rows`, rows.map(r => [...r, '']));
+                                  }}
+                                  className="p-1 hover:text-blue-600"
+                                >
+                                  <Plus size={12} />
+                                </button>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(currentValues.tables?.[tableIndex]?.rows || []).map((row, rIdx) => (
+                              <tr key={rIdx}>
+                                {row.map((_, cIdx) => (
+                                  <td key={cIdx} className="p-1 border border-slate-200">
+                                    <input 
+                                      {...register(`tables.${tableIndex}.rows.${rIdx}.${cIdx}` as const)}
+                                      className="w-full bg-transparent border-none text-xs text-slate-600 focus:ring-0"
+                                    />
+                                  </td>
+                                ))}
+                                <td className="border border-slate-200 text-center">
+                                  <button 
+                                    type="button"
+                                    onClick={() => {
+                                      const rows = [...(currentValues.tables?.[tableIndex]?.rows || [])];
+                                      rows.splice(rIdx, 1);
+                                      setValue(`tables.${tableIndex}.rows`, rows);
+                                    }}
+                                    className="text-red-400 hover:text-red-600"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            const rows = [...(currentValues.tables?.[tableIndex]?.rows || [])];
+                            const colCount = (currentValues.tables?.[tableIndex]?.headers || []).length || 2;
+                            rows.push(new Array(colCount).fill(''));
+                            setValue(`tables.${tableIndex}.rows`, rows);
+                          }}
+                          className="mt-2 text-[10px] font-bold text-slate-400 hover:text-blue-600 flex items-center gap-1"
+                        >
+                          <Plus size={10} /> Adicionar Linha
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Images Section */}
               <div className="pt-6 border-t border-slate-100">
                 <div className="flex items-center justify-between mb-4">
@@ -953,7 +1106,7 @@ export default function PopEditor() {
                 <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
                   <Link2 size={14} /> Referências Normativas
                 </label>
-                <input {...register('references')} className="input-field" placeholder="RDC 44/2009, etc." />
+                <textarea {...register('references')} rows={3} className="input-field" placeholder="RDC 44/2009, etc." />
               </div>
             </div>
           </div>
@@ -988,6 +1141,35 @@ export default function PopEditor() {
                 )}
               </div>
             </div>
+
+            {id && (
+              <div className="pt-6 border-t border-slate-50">
+                <button
+                  type="button"
+                  onClick={deletePop}
+                  disabled={deleting}
+                  className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-3 border ${
+                    confirmDelete 
+                      ? 'bg-red-600 text-white border-red-700 shadow-lg shadow-red-200 animate-pulse' 
+                      : 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100'
+                  }`}
+                >
+                  {deleting ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : confirmDelete ? (
+                    'Confirmar Exclusão'
+                  ) : (
+                    <>
+                      <Trash2 size={18} />
+                      Excluir Este POP
+                    </>
+                  )}
+                </button>
+                {confirmDelete && (
+                  <p className="text-[10px] text-red-500 font-bold text-center mt-2 uppercase tracking-tight">Esta ação é irreversível.</p>
+                )}
+              </div>
+            )}
 
             {currentValues.status === 'active' && (
               <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-3xl flex items-center gap-3 text-emerald-700 text-xs font-bold leading-tight">
@@ -1028,6 +1210,21 @@ export default function PopEditor() {
           </div>
         </div>
       </div>
+      )}
+
+      {isExportingPDF && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-950/85 backdrop-blur-md text-white p-6">
+          <div className="flex flex-col items-center gap-4 text-center max-w-sm">
+            <div className="relative w-16 h-16">
+              <div className="absolute inset-0 rounded-full border-4 border-blue-500/20"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"></div>
+            </div>
+            <h3 className="text-sm font-black uppercase tracking-widest text-blue-400">Exportando PDF Real</h3>
+            <p className="text-xs text-slate-300 font-medium animate-pulse">{exportStep}</p>
+            <span className="text-[10px] text-slate-500 italic mt-2">Compilando cabeçalhos, tabelas, imagens e assinaturas oficiais no mesmo padrão de alta fidelidade do visualizador.</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
