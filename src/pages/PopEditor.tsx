@@ -29,7 +29,12 @@ import {
   Image as ImageIcon,
   X,
   Type,
-  AlignJustify
+  AlignJustify,
+  ArrowUp,
+  ArrowDown,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles
 } from 'lucide-react';
 import { POP_TEMPLATES, POPTemplate } from '../constants/templates';
 import { jsPDF } from 'jspdf';
@@ -67,8 +72,14 @@ const popSchema = z.object({
     caption: z.string().optional(),
   })).optional(),
   customFields: z.array(z.object({
-    label: z.string(),
-    value: z.string(),
+    label: z.string().min(1, "Rótulo obrigatório"),
+    value: z.string().optional(),
+    type: z.string().optional(), // 'text' | 'textarea' | 'select' | 'checklist' | 'date' | 'signature'
+    options: z.string().optional(),   // semicolon or comma separated options
+    width: z.string().optional(),   // 'full' | 'half'
+    required: z.boolean().optional(),
+    placeholder: z.string().optional(),
+    helpText: z.string().optional(),
   })).optional(),
   tables: z.array(z.object({
     title: z.string().optional(),
@@ -206,6 +217,131 @@ export default function PopEditor() {
   });
 
   const currentValues = watch();
+
+  // Helper to add a column to a table
+  const addColumn = (tableIndex: number) => {
+    const table = currentValues.tables?.[tableIndex];
+    if (!table) return;
+    const headers = [...(table.headers || [])];
+    headers.push('');
+    setValue(`tables.${tableIndex}.headers`, headers);
+    
+    const rows = [...(table.rows || [])];
+    const updatedRows = rows.map(r => [...r, '']);
+    setValue(`tables.${tableIndex}.rows`, updatedRows);
+  };
+
+  // Helper to delete a column from a table
+  const deleteColumn = (tableIndex: number, colIndex: number) => {
+    const table = currentValues.tables?.[tableIndex];
+    if (!table) return;
+    const headers = [...(table.headers || [])];
+    if (headers.length <= 1) return; // Must have at least one column
+    headers.splice(colIndex, 1);
+    setValue(`tables.${tableIndex}.headers`, headers);
+    
+    const rows = [...(table.rows || [])];
+    const updatedRows = rows.map(row => {
+      const newRow = [...row];
+      newRow.splice(colIndex, 1);
+      return newRow;
+    });
+    setValue(`tables.${tableIndex}.rows`, updatedRows);
+  };
+
+  // Helper to move column left or right
+  const moveColumn = (tableIndex: number, colIndex: number, direction: 'left' | 'right') => {
+    const table = currentValues.tables?.[tableIndex];
+    if (!table) return;
+    const headers = [...(table.headers || [])];
+    const targetIndex = direction === 'left' ? colIndex - 1 : colIndex + 1;
+    if (targetIndex < 0 || targetIndex >= headers.length) return;
+    
+    // Swap header text
+    const tempHeader = headers[colIndex];
+    headers[colIndex] = headers[targetIndex];
+    headers[targetIndex] = tempHeader;
+    setValue(`tables.${tableIndex}.headers`, headers);
+    
+    // Swap row cells
+    const rows = [...(table.rows || [])];
+    const updatedRows = rows.map(row => {
+      const newRow = [...row];
+      const tempCell = newRow[colIndex];
+      newRow[colIndex] = newRow[targetIndex];
+      newRow[targetIndex] = tempCell;
+      return newRow;
+    });
+    setValue(`tables.${tableIndex}.rows`, updatedRows);
+  };
+
+  // Helper to move row up or down
+  const moveRow = (tableIndex: number, rowIndex: number, direction: 'up' | 'down') => {
+    const table = currentValues.tables?.[tableIndex];
+    if (!table) return;
+    const rows = [...(table.rows || [])];
+    const targetIndex = direction === 'up' ? rowIndex - 1 : rowIndex + 1;
+    if (targetIndex < 0 || targetIndex >= rows.length) return;
+    
+    const tempRow = rows[rowIndex];
+    rows[rowIndex] = rows[targetIndex];
+    rows[targetIndex] = tempRow;
+    setValue(`tables.${tableIndex}.rows`, rows);
+  };
+
+  // Helper to add a row to a table
+  const addRow = (tableIndex: number) => {
+    const table = currentValues.tables?.[tableIndex];
+    if (!table) return;
+    const rows = [...(table.rows || [])];
+    const colCount = (table.headers || []).length || 2;
+    rows.push(new Array(colCount).fill(''));
+    setValue(`tables.${tableIndex}.rows`, rows);
+  };
+
+  // Helper to move custom fields up or down
+  const moveCustomField = (index: number, direction: 'up' | 'down') => {
+    const fields = [...(currentValues.customFields || [])];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= fields.length) return;
+    const temp = fields[index];
+    fields[index] = fields[targetIndex];
+    fields[targetIndex] = temp;
+    setValue('customFields', fields);
+  };
+
+  // Helper to load complete professional form templates
+  const loadFormTemplate = (templateType: 'temperature' | 'hygiene' | 'narcotics') => {
+    let fields: any[] = [];
+    if (templateType === 'temperature') {
+      fields = [
+        { label: 'Temperatura do Termohigrômetro (ºC)', value: '', type: 'text', placeholder: 'Ex: 5,4 ºC', width: 'half', required: true, helpText: 'Preencher a temperatura atual do refrigerador' },
+        { label: 'Umidade Relativa do Ar (%)', value: '', type: 'text', placeholder: 'Ex: 45%', width: 'half', required: true, helpText: 'Preencher a umidade atual do ambiente' },
+        { label: 'Equipamento dentro das especificações?', value: 'Sim', type: 'select', options: 'Sim, Não', width: 'full', required: true, helpText: 'Indique se os valores estão dentro da margem aceitável' },
+        { label: 'Ação corretiva se desvio', value: '', type: 'textarea', placeholder: 'Descreva a ação tomada caso estivesse fora...', width: 'full', required: false },
+        { label: 'Assinatura do Farmacêutico ou Operador', value: '', type: 'signature', width: 'full', required: true }
+      ];
+    } else if (templateType === 'hygiene') {
+      fields = [
+        { label: 'Data e Hora da Higienização', value: '', type: 'date', width: 'half', required: true },
+        { label: 'Responsável pela Higienização', value: '', type: 'text', placeholder: 'Nome completo...', width: 'half', required: true },
+        { label: 'Itens Verificados e Limpos', value: '', type: 'checklist', options: 'Bancadas e pias higienizadas; Lixeiras esvaziadas; Pisos limpos e secos; Utensílios esterilizados', width: 'full', required: true, helpText: 'Marque todos os itens concluídos na rotina' },
+        { label: 'Problemas encontrados ou observações', value: 'Nenhuma irregularidade encontrada.', type: 'textarea', placeholder: 'Ex: Descreva vazamentos...', width: 'full', required: false },
+        { label: 'Assinatura do Inspetor de Turno', value: '', type: 'signature', width: 'full', required: true }
+      ];
+    } else if (templateType === 'narcotics') {
+      fields = [
+        { label: 'Nome Completo do Comprador', value: '', type: 'text', placeholder: 'Paciente ou portador...', width: 'full', required: true },
+        { label: 'Documento de Identidade (RG/CPF)', value: '', type: 'text', placeholder: 'Documento oficial...', width: 'half', required: true },
+        { label: 'Número da Receita de Controle Especial', value: '', type: 'text', placeholder: 'Ex: A1-12345/2026', width: 'half', required: true },
+        { label: 'Medicamento Dispensado', value: '', type: 'text', placeholder: 'Ex: Cloridrato de Metilfenidato 10mg', width: 'full', required: true },
+        { label: 'Dados do Médico (Nome e CRM)', value: '', type: 'text', placeholder: 'Nome do prescritor com CRM/UF', width: 'full', required: true },
+        { label: 'Receita retida e carimbada?', value: 'Sim', type: 'select', options: 'Sim, Não', width: 'half', required: true },
+        { label: 'Assinatura do Receptor / Paciente', value: '', type: 'signature', width: 'full', required: true }
+      ];
+    }
+    setValue('customFields', fields);
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -518,7 +654,16 @@ export default function PopEditor() {
           status: data.status || 'draft',
           version: data.version || 1,
           images: data.images || [],
-          customFields: data.customFields || [],
+          customFields: (data.customFields || []).map((f: any) => ({
+            label: f.label || '',
+            value: f.value || '',
+            type: f.type || 'text',
+            options: f.options || '',
+            width: f.width || 'full',
+            required: typeof f.required === 'boolean' ? f.required : false,
+            placeholder: f.placeholder || '',
+            helpText: f.helpText || '',
+          })),
           tables: parsedTables,
         };
 
@@ -918,46 +1063,318 @@ export default function PopEditor() {
 
               {/* Custom Fields Section */}
               <div className="pt-6 border-t border-slate-100">
-                <div className="flex items-center justify-between mb-4">
-                  <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
-                    <Type size={14} /> Campos Personalizados
-                  </label>
-                  <button 
-                    type="button"
-                    onClick={() => appendCustomField({ label: '', value: '' })}
-                    className="text-xs font-bold text-sky-600 hover:text-sky-700 flex items-center gap-1"
-                  >
-                    <Plus size={14} /> Adicionar Campo
-                  </button>
-                </div>
-                
-                <div className="space-y-3">
-                  {customFieldItems.map((field, index) => (
-                    <div key={field.id} className="flex flex-col md:flex-row gap-3 items-start bg-slate-50 p-3 rounded-xl border border-slate-100 relative group">
-                      <div className="flex-1 w-full space-y-1">
-                        <input 
-                          {...register(`customFields.${index}.label` as const)} 
-                          placeholder="Nome do campo (Ex: Observações)" 
-                          className="w-full text-xs font-bold uppercase bg-transparent border-none focus:ring-0 p-0 text-slate-500"
-                        />
-                        <textarea 
-                          {...register(`customFields.${index}.value` as const)} 
-                          placeholder="Conteúdo..." 
-                          className="w-full text-sm bg-white border border-slate-200 rounded-lg p-2 focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none"
-                          rows={2}
-                        />
-                      </div>
-                      <button 
-                        type="button"
-                        onClick={() => removeCustomField(index)}
-                        className="p-1 text-slate-400 hover:text-red-500 transition-colors"
-                      >
-                        <X size={16} />
-                      </button>
+                <div className="mb-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                    <div>
+                      <label className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+                        <Type size={14} className="text-sky-500" /> Formulários & Registros Integrados
+                      </label>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Crie termos de consentimento, checklists de higiene, registros de temperatura ou relatórios anexados ao seu POP.</p>
                     </div>
-                  ))}
+                    <button 
+                      type="button"
+                      onClick={() => appendCustomField({ label: '', value: '', type: 'text', width: 'full', required: false, options: '', placeholder: '', helpText: '' })}
+                      className="self-start md:self-auto bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+                    >
+                      <Plus size={12} /> Adicionar Campo ao Formulário
+                    </button>
+                  </div>
+                </div>
+
+                {/* Modelos de Formulários Rápidos */}
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 mb-4">
+                  <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-2">Modelos Prontos de Registros para Farmácias (1-Clique)</span>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => loadFormTemplate('temperature')}
+                      className="bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-200 text-[10px] font-semibold text-slate-700 hover:text-amber-705 px-2.5 py-1.5 rounded-md flex items-center gap-1 transition-all"
+                    >
+                      🌡️ Controle de Temperatura (Termolábeis)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => loadFormTemplate('hygiene')}
+                      className="bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 text-[10px] font-semibold text-slate-700 hover:text-emerald-705 px-2.5 py-1.5 rounded-md flex items-center gap-1 transition-all"
+                    >
+                      🧹 Higiene & Limpeza Diária
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => loadFormTemplate('narcotics')}
+                      className="bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-[10px] font-semibold text-slate-700 hover:text-indigo-705 px-2.5 py-1.5 rounded-md flex items-center gap-1 transition-all"
+                    >
+                      📋 Dispensação (Controlados / Portaria 344)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {customFieldItems.map((field, index) => {
+                    const fieldType = watch(`customFields.${index}.type`) || 'text';
+                    return (
+                      <div key={field.id} className="bg-white border border-slate-150 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow relative space-y-3">
+                        {/* Header of Field Card */}
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                          <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest bg-slate-50 px-2 py-0.5 rounded">
+                            Campo #{index + 1} • {
+                              fieldType === 'text' ? 'Texto Curto' :
+                              fieldType === 'textarea' ? 'Texto Longo' :
+                              fieldType === 'select' ? 'Seleção (Dropdown)' :
+                              fieldType === 'checklist' ? 'Lista de Checagem' :
+                              fieldType === 'date' ? 'Data / Calendário' :
+                              fieldType === 'signature' ? 'Assinatura Oficial' : 'Campo de Texto'
+                            }
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => moveCustomField(index, 'up')}
+                              disabled={index === 0}
+                              className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-slate-100 disabled:opacity-20 transition-all font-bold"
+                              title="Mover para cima"
+                            >
+                              <ArrowUp size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveCustomField(index, 'down')}
+                              disabled={index === customFieldItems.length - 1}
+                              className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-slate-100 disabled:opacity-20 transition-all font-bold"
+                              title="Mover para baixo"
+                            >
+                              <ArrowDown size={12} />
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => removeCustomField(index)}
+                              className="p-1 rounded text-slate-400 hover:text-red-500 hover:bg-slate-100 transition-all"
+                              title="Excluir Campo"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Grids of properties */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Left Column: Descriptions and names */}
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 block mb-1">LABEL (NOME DO CAMPO) *</label>
+                              <input 
+                                {...register(`customFields.${index}.label` as const)} 
+                                placeholder="Nome identificador da informação. Ex: Temperatura ºC" 
+                                className="w-full text-xs bg-slate-50/50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-sky-500 focus:bg-white focus:border-transparent outline-none transition-all font-semibold text-slate-700"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 block mb-1">TEXTO DE AJUDA / INSTRUÇÃO (OPCIONAL)</label>
+                              <input 
+                                {...register(`customFields.${index}.helpText` as const)} 
+                                placeholder="Instruções para o operador ao preencher..." 
+                                className="w-full text-xs bg-slate-50/50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-sky-500 focus:bg-white focus:border-transparent outline-none transition-all text-slate-600"
+                              />
+                            </div>
+
+                            {fieldType !== 'signature' && fieldType !== 'checklist' && (
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-500 block mb-1">CONTEÚDO PADRÃO OU RESPOSTA</label>
+                                <textarea 
+                                  {...register(`customFields.${index}.value` as const)} 
+                                  placeholder="Valor pré-definido / resposta do formulário..." 
+                                  className="w-full text-xs bg-slate-50/50 border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-sky-500 focus:bg-white focus:border-transparent outline-none transition-all text-slate-600"
+                                  rows={1}
+                                />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Right Column: Settings & Logic */}
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-500 block mb-1">TIPO DE CAMPO</label>
+                                <select
+                                  {...register(`customFields.${index}.type` as const)}
+                                  className="w-full text-xs bg-slate-50/50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-sky-500 focus:bg-white focus:border-transparent outline-none transition-all text-slate-700 font-medium"
+                                >
+                                  <option value="text">Texto Curto</option>
+                                  <option value="textarea">Texto Longo (Anotações)</option>
+                                  <option value="select">Seleção (Caixa suspensa)</option>
+                                  <option value="checklist">Caixas de Checagem (Checklist)</option>
+                                  <option value="date">Data & Calendário</option>
+                                  <option value="signature">Área de Assinatura</option>
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-500 block mb-1">DISPOSIÇÃO / EXPANSÃO</label>
+                                <select
+                                  {...register(`customFields.${index}.width` as const)}
+                                  className="w-full text-xs bg-slate-50/50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-sky-500 focus:bg-white focus:border-transparent outline-none transition-all text-slate-700 font-medium"
+                                >
+                                  <option value="full">Largura Inteira (100%)</option>
+                                  <option value="half">Meia Largura (50%)</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            {/* Conditional options for dropdown select and checkboxes */}
+                            {(fieldType === 'select' || fieldType === 'checklist') && (
+                              <div className="bg-sky-50 border border-sky-100/50 rounded-xl p-3 space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-[10px] font-bold text-sky-800 block">OPÇÕES (SEPARADAS POR VÍRGULA)</label>
+                                  <span className="text-[8px] font-bold text-sky-600 bg-white px-1.5 py-0.5 rounded shadow-sm">Configurar</span>
+                                </div>
+                                <input
+                                  {...register(`customFields.${index}.options` as const)}
+                                  placeholder="Ex: Sim, Não, Não se aplica"
+                                  className="w-full text-xs bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-sky-500 outline-none font-semibold text-slate-700"
+                                />
+                                <p className="text-[9px] text-sky-600">Escreva as alternativas que as pessoas podem escolher ou verificar.</p>
+                              </div>
+                            )}
+
+                            {/* Checkboxes parameters */}
+                            <div className="flex items-center gap-4 pt-1">
+                              <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  {...register(`customFields.${index}.required` as const)}
+                                  className="h-3.5 w-3.5 text-sky-600 border-slate-300 rounded focus:ring-sky-500"
+                                />
+                                <span className="text-[10px] font-bold text-slate-600">Campo Obrigatório</span>
+                              </label>
+                              
+                              {fieldType !== 'signature' && fieldType !== 'checklist' && (
+                                <div>
+                                  <input 
+                                    {...register(`customFields.${index}.placeholder` as const)} 
+                                    placeholder="Placeholder..." 
+                                    className="text-[10px] bg-slate-50/20 border-b border-dashed border-slate-305 focus:border-sky-505 outline-none text-slate-500 text-center w-36"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
                   {customFieldItems.length === 0 && (
-                    <p className="text-center py-4 text-xs text-slate-400 italic">Nenhum campo personalizado adicionado.</p>
+                    <div className="text-center py-8 border border-dashed border-slate-200 rounded-2xl bg-slate-50">
+                      <Sparkles size={24} className="text-slate-350 mx-auto mb-2" />
+                      <p className="text-xs font-semibold text-slate-500">Nenhum campo personalizado de registro annexed</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Use os botões de 1-clique acima para carregar um modelo pronto ou adicionar campos avulsos.</p>
+                    </div>
+                  )}
+
+                  {/* Elegant Interactive Preview Block of the custom fields */}
+                  {customFieldItems.length > 0 && (
+                    <div className="mt-8 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-inner">
+                      <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
+                        <div>
+                          <h4 className="text-[11px] font-black uppercase text-blue-400 tracking-wider flex items-center gap-1.5">
+                            👁️ Painel Interativo do Formulário (Web Preview)
+                          </h4>
+                          <p className="text-[9px] text-slate-400 mt-0.5">Siga as instruções abaixo para testar as caixas interativas, calendários e digitação do registro.</p>
+                        </div>
+                        <span className="text-[8px] font-mono bg-blue-950 text-blue-400 border border-blue-900 px-2 py-0.5 rounded">WEB PREVIEW ATIVO</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-950 p-4 border border-slate-800 rounded-xl max-w-full">
+                        {customFieldItems.map((item, idx) => {
+                          const fLabel = watch(`customFields.${idx}.label`) || `Campo #${idx + 1}`;
+                          const fType = watch(`customFields.${idx}.type`) || 'text';
+                          const fOptions = watch(`customFields.${idx}.options`) || '';
+                          const fWidth = watch(`customFields.${idx}.width`) || 'full';
+                          const fPlaceholder = watch(`customFields.${idx}.placeholder`) || '';
+                          const fHelp = watch(`customFields.${idx}.helpText`) || '';
+                          const fRequired = watch(`customFields.${idx}.required`);
+                          const optionsArray = fOptions ? fOptions.split(/[,;]/).map(o => o.trim()).filter(Boolean) : [];
+
+                          return (
+                            <div key={idx} className={`space-y-1.5 ${fWidth === 'full' ? 'col-span-1 md:col-span-2' : 'col-span-1'}`}>
+                              <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wide flex items-center gap-1">
+                                {fLabel}
+                                {fRequired && <span className="text-rose-500 font-black text-[12px]">*</span>}
+                              </label>
+
+                              {fHelp && (
+                                <p className="text-[9px] text-slate-400 italic">{fHelp}</p>
+                              )}
+
+                              {fType === 'text' && (
+                                <input
+                                  type="text"
+                                  placeholder={fPlaceholder || "Preencher resposta..."}
+                                  className="w-full text-xs font-mono bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-350 focus:border-blue-500 outline-none"
+                                />
+                              )}
+
+                              {fType === 'textarea' && (
+                                <textarea
+                                  placeholder={fPlaceholder || "Preencher observações..."}
+                                  rows={2}
+                                  className="w-full text-xs font-mono bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-355 focus:border-blue-500 outline-none"
+                                />
+                              )}
+
+                              {fType === 'date' && (
+                                <input
+                                  type="date"
+                                  className="w-full text-xs font-mono bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-355 focus:border-blue-500 outline-none"
+                                />
+                              )}
+
+                              {fType === 'select' && (
+                                <select
+                                  className="w-full text-xs font-mono bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-355 focus:border-blue-500 outline-none"
+                                >
+                                  {optionsArray.length === 0 ? (
+                                    <option>-- Nenhuma opção configurada --</option>
+                                  ) : (
+                                    optionsArray.map((opt, oIdx) => (
+                                      <option key={oIdx} value={opt}>{opt}</option>
+                                    ))
+                                  )}
+                                </select>
+                              )}
+
+                              {fType === 'checklist' && (
+                                <div className="bg-slate-900/50 border border-slate-800/80 rounded p-2.5 space-y-1.5">
+                                  {optionsArray.length === 0 ? (
+                                    <p className="text-[9px] text-slate-500 italic">Escreva as opções do checklist no construtor para visualizá-las aqui...</p>
+                                  ) : (
+                                    optionsArray.map((opt, oIdx) => (
+                                      <label key={oIdx} className="flex items-center gap-2 cursor-pointer select-none">
+                                        <input
+                                          type="checkbox"
+                                          className="h-3.5 w-3.5 text-blue-500 border-slate-800 bg-slate-900 rounded focus:ring-blue-500"
+                                        />
+                                        <span className="text-[10px] text-slate-300">{opt}</span>
+                                      </label>
+                                    ))
+                                  )}
+                                </div>
+                              )}
+
+                              {fType === 'signature' && (
+                                <div className="bg-slate-900 border border-dashed border-slate-705 rounded-xl p-4 text-center">
+                                  <div className="w-full h-8 border-b border-slate-800 mb-1 flex items-center justify-center">
+                                    <span className="text-[8px] text-slate-500 uppercase font-mono tracking-widest">[ÁREA DE ASSINATURA INDIVIDUAL]</span>
+                                  </div>
+                                  <span className="text-[9px] font-black uppercase text-slate-400 block tracking-wide">{fLabel}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1000,73 +1417,118 @@ export default function PopEditor() {
                       <div className="overflow-x-auto">
                         <table className="w-full border-collapse">
                           <thead>
-                            <tr>
+                            <tr className="bg-slate-100">
                               {currentValues.tables?.[tableIndex]?.headers.map((_, hIdx) => (
-                                <th key={hIdx} className="p-2 border border-slate-200 min-w-[120px]">
-                                  <input 
-                                    {...register(`tables.${tableIndex}.headers.${hIdx}` as const)}
-                                    className="w-full bg-transparent border-none text-[10px] font-black uppercase text-slate-600 focus:ring-0 text-center"
-                                    placeholder={`Coluna ${hIdx + 1}`}
-                                  />
+                                <th key={hIdx} className="p-2 border border-slate-200 min-w-[140px] text-center bg-slate-50">
+                                  <div className="flex flex-col gap-1 items-center">
+                                    <input 
+                                      {...register(`tables.${tableIndex}.headers.${hIdx}` as const)}
+                                      className="w-full bg-white border border-slate-200 rounded px-1.5 py-1 text-[10px] font-black uppercase text-slate-700 text-center focus:ring-1 focus:ring-blue-500"
+                                      placeholder={`Coluna ${hIdx + 1}`}
+                                    />
+                                    <div className="flex items-center gap-1.5 mt-1 border-t border-slate-100 pt-1 w-full justify-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => moveColumn(tableIndex, hIdx, 'left')}
+                                        disabled={hIdx === 0}
+                                        className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-slate-200 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-colors"
+                                        title="Mover coluna para esquerda"
+                                      >
+                                        <ChevronLeft size={12} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => deleteColumn(tableIndex, hIdx)}
+                                        disabled={(currentValues.tables?.[tableIndex]?.headers.length || 0) <= 1}
+                                        className="p-1 rounded text-slate-400 hover:text-red-500 hover:bg-slate-200 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-colors"
+                                        title="Excluir coluna"
+                                      >
+                                        <Trash2 size={12} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => moveColumn(tableIndex, hIdx, 'right')}
+                                        disabled={hIdx === (currentValues.tables?.[tableIndex]?.headers.length || 0) - 1}
+                                        className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-slate-200 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-colors"
+                                        title="Mover coluna para direita"
+                                      >
+                                        <ChevronRight size={12} />
+                                      </button>
+                                    </div>
+                                  </div>
                                 </th>
                               ))}
-                              <th className="border border-slate-200 w-8">
-                                <button 
-                                  type="button" 
-                                  onClick={() => {
-                                    const headers = [...(currentValues.tables?.[tableIndex]?.headers || [])];
-                                    headers.push('');
-                                    setValue(`tables.${tableIndex}.headers`, headers);
-                                    const rows = [...(currentValues.tables?.[tableIndex]?.rows || [])];
-                                    setValue(`tables.${tableIndex}.rows`, rows.map(r => [...r, '']));
-                                  }}
-                                  className="p-1 hover:text-blue-600"
-                                >
-                                  <Plus size={12} />
-                                </button>
+                              <th className="p-2 border border-slate-200 w-24 text-[10px] font-black uppercase text-slate-500 text-center bg-slate-50">
+                                Ações de Linha
                               </th>
                             </tr>
                           </thead>
                           <tbody>
                             {(currentValues.tables?.[tableIndex]?.rows || []).map((row, rIdx) => (
-                              <tr key={rIdx}>
+                              <tr key={rIdx} className="hover:bg-white transition-colors">
                                 {row.map((_, cIdx) => (
                                   <td key={cIdx} className="p-1 border border-slate-200">
                                     <input 
                                       {...register(`tables.${tableIndex}.rows.${rIdx}.${cIdx}` as const)}
-                                      className="w-full bg-transparent border-none text-xs text-slate-600 focus:ring-0"
+                                      className="w-full bg-transparent border-none text-xs text-slate-600 focus:ring-0 focus:bg-white rounded px-1"
                                     />
                                   </td>
                                 ))}
-                                <td className="border border-slate-200 text-center">
-                                  <button 
-                                    type="button"
-                                    onClick={() => {
-                                      const rows = [...(currentValues.tables?.[tableIndex]?.rows || [])];
-                                      rows.splice(rIdx, 1);
-                                      setValue(`tables.${tableIndex}.rows`, rows);
-                                    }}
-                                    className="text-red-400 hover:text-red-600"
-                                  >
-                                    <X size={12} />
-                                  </button>
+                                <td className="p-1 border border-slate-200 text-center">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => moveRow(tableIndex, rIdx, 'up')}
+                                      disabled={rIdx === 0}
+                                      className="p-1 text-slate-400 hover:text-blue-600 disabled:opacity-20 disabled:hover:text-slate-400 transition-colors"
+                                      title="Mover linha para cima"
+                                    >
+                                      <ArrowUp size={12} />
+                                    </button>
+                                    <button 
+                                      type="button"
+                                      onClick={() => {
+                                        const rows = [...(currentValues.tables?.[tableIndex]?.rows || [])];
+                                        rows.splice(rIdx, 1);
+                                        setValue(`tables.${tableIndex}.rows`, rows);
+                                      }}
+                                      className="p-1 text-slate-400 hover:text-red-500 transition-colors"
+                                      title="Excluir linha"
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => moveRow(tableIndex, rIdx, 'down')}
+                                      disabled={rIdx === (currentValues.tables?.[tableIndex]?.rows || []).length - 1}
+                                      className="p-1 text-slate-400 hover:text-blue-600 disabled:opacity-20 disabled:hover:text-slate-400 transition-colors"
+                                      title="Mover linha para baixo"
+                                    >
+                                      <ArrowDown size={12} />
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            const rows = [...(currentValues.tables?.[tableIndex]?.rows || [])];
-                            const colCount = (currentValues.tables?.[tableIndex]?.headers || []).length || 2;
-                            rows.push(new Array(colCount).fill(''));
-                            setValue(`tables.${tableIndex}.rows`, rows);
-                          }}
-                          className="mt-2 text-[10px] font-bold text-slate-400 hover:text-blue-600 flex items-center gap-1"
-                        >
-                          <Plus size={10} /> Adicionar Linha
-                        </button>
+                        
+                        <div className="flex items-center gap-2 mt-3">
+                          <button 
+                            type="button"
+                            onClick={() => addRow(tableIndex)}
+                            className="bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-200 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+                          >
+                            <Plus size={12} /> Adicionar Linha
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => addColumn(tableIndex)}
+                            className="bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+                          >
+                            <Plus size={12} /> Adicionar Coluna
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}

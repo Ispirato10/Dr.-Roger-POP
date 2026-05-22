@@ -22,6 +22,17 @@ service cloud.firestore {
       );
     }
 
+    // Custom Forms rules
+    match /customForms/{formId} {
+      allow read, write: if isSignedIn() && (
+        resource == null || 
+        resource.data.drugstoreId == request.auth.uid || 
+        resource.data.ownerId == request.auth.uid ||
+        request.resource.data.drugstoreId == request.auth.uid ||
+        request.resource.data.ownerId == request.auth.uid
+      );
+    }
+
     // Drugstore rules
     match /drugstores/{drugstoreId} {
       allow read, write: if isSignedIn() && (drugstoreId == request.auth.uid || (resource != null && resource.data.ownerId == request.auth.uid));

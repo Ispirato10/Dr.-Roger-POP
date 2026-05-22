@@ -81,6 +81,23 @@
         "fields": { "type": "array" }
       }
     },
+    "CustomForm": {
+      "title": "Custom Form",
+      "description": "Formulário personalizado criado pelo usuário",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "code": { "type": "string" },
+        "version": { "type": "number" },
+        "description": { "type": "string" },
+        "drugstoreId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "fields": { "type": "array" }
+      },
+      "required": ["title", "code", "drugstoreId"]
+    },
     "POPRevision": {
       "title": "POP Revision History",
       "description": "Histérico de revisões de um POP",
@@ -119,6 +136,10 @@
     "/revisions/{revisionId}": {
       "schema": "POPRevision",
       "description": "Coleção de histórico de revisões"
+    },
+    "/customForms/{formId}": {
+      "schema": "CustomForm",
+      "description": "Coleção de formulários personalizados"
     }
   }
 }

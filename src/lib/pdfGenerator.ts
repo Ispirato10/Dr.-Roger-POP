@@ -207,36 +207,162 @@ export const generatePopPDF = async (data: any, drugstore: any) => {
     }
   }
 
-  // Custom Metadata
+  // Custom Metadata / Forms
   if (data.customFields && data.customFields.length > 0) {
     let hasCustomFields = false;
     for (const meta of data.customFields) {
-      if (meta.label && meta.value) {
+      if (meta.label) {
         hasCustomFields = true;
         break;
       }
     }
+    
     if (hasCustomFields) {
-      renderTechnicalTitle("INFORMAÇÕES OPERACIONAIS EXTRAS");
+      renderTechnicalTitle("VOLUMETRIA E FORMULÁRIO DE REGISTRO ANEXO");
+      
       for (const meta of data.customFields) {
-        if (meta.label && meta.value) {
+        if (!meta.label) continue;
+        
+        const type = meta.type || 'text';
+        const requiredText = meta.required ? ' (*)' : '';
+        const displayLabel = `${meta.label.toUpperCase()}${requiredText}`;
+        const help = meta.helpText || '';
+        
+        checkPageOverflow(18); // Minimum space needed for a field segment
+        
+        // Render Field Label
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(15, 23, 42);
+        doc.text(displayLabel, 15, currentY);
+        currentY += 4.5;
+        
+        // Render Help Text if any
+        if (help) {
+          doc.setFont("helvetica", "oblique");
+          doc.setFontSize(8);
+          doc.setTextColor(100, 116, 139);
+          const helpLines = doc.splitTextToSize(help, 175);
+          for (const hLine of helpLines) {
+            checkPageOverflow(4);
+            doc.text(hLine, 15, currentY);
+            currentY += 4;
+          }
+        }
+        
+        // Draw the input container based on type
+        if (type === 'signature') {
+          currentY += 8;
           checkPageOverflow(14);
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(12); // ABNT font size 12
-          doc.setTextColor(15, 23, 42);
-          doc.text(`${meta.label.toUpperCase()}:`, 15, currentY);
+          doc.setDrawColor(148, 163, 184);
+          doc.setLineWidth(0.3);
+          doc.line(15, currentY, 115, currentY); // Draw signature line
+          currentY += 4.5;
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(8.5);
+          doc.setTextColor(71, 85, 105);
+          doc.text(`Assinatura / Carimbo do Responsável Técnico ou Supervisor`, 15, currentY);
+          currentY += 6;
+        } 
+        else if (type === 'checklist') {
+          const optionsStr = meta.options || '';
+          const optionsList = optionsStr ? optionsStr.split(/[,;]/).map((o: any) => o.trim()).filter(Boolean) : [];
+          
+          currentY += 1.5;
+          if (optionsList.length === 0) {
+            doc.setFont("helvetica", "italic");
+            doc.setFontSize(9);
+            doc.setTextColor(148, 163, 184);
+            doc.text("[Nenhuma caixa de checagem configurada]", 18, currentY);
+            currentY += 5;
+          } else {
+            for (const opt of optionsList) {
+              checkPageOverflow(6.5);
+              doc.setDrawColor(100, 116, 139);
+              doc.setLineWidth(0.3);
+              doc.rect(15, currentY - 3.2, 3.2, 3.2); // Checkbox square
+              
+              doc.setFont("helvetica", "normal");
+              doc.setFontSize(9);
+              doc.setTextColor(51, 65, 85);
+              doc.text(opt, 20, currentY - 0.5);
+              currentY += 5.2;
+            }
+          }
+          currentY += 1.5;
+        } 
+        else if (type === 'select') {
+          const valueStr = meta.value || '';
+          const optionsStr = meta.options || '';
+          const optionsList = optionsStr ? optionsStr.split(/[,;]/).map((o: any) => o.trim()).filter(Boolean) : [];
           
           doc.setFont("helvetica", "normal");
-          doc.setFontSize(11); // Standard metadata description size
+          doc.setFontSize(10);
           doc.setTextColor(51, 65, 85);
-          const valLines = doc.splitTextToSize(meta.value, 130);
-          for (const line of valLines) {
-            checkPageOverflow(5.2);
-            doc.text(line, 60, currentY);
-            currentY += 5.2;
+          
+          // Show current value, or the list of choices in parentheses if empty
+          if (valueStr) {
+            doc.text(valueStr, 15, currentY);
+            currentY += 5;
+          } else {
+            const formattedOptions = optionsList.slice(0, 4).join(" | ") + (optionsList.length > 4 ? "..." : "");
+            doc.text(`[ Selecionar uma opção:  ${formattedOptions || 'Sem opções configuradas'} ]`, 15, currentY);
+            currentY += 5.5;
           }
-          currentY += 3;
+          currentY += 1.5;
+        } 
+        else if (type === 'date') {
+          const valueStr = meta.value || '___ / ___ / _____';
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(10);
+          doc.setTextColor(51, 65, 85);
+          doc.text(valueStr, 15, currentY);
+          currentY += 5.5;
+          currentY += 1.5;
+        } 
+        else if (type === 'textarea') {
+          const valueStr = meta.value || '';
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(10);
+          doc.setTextColor(51, 65, 85);
+          
+          if (valueStr) {
+            const valLines = doc.splitTextToSize(valueStr, 175);
+            for (const line of valLines) {
+              checkPageOverflow(5);
+              doc.text(line, 15, currentY);
+              currentY += 5;
+            }
+          } else {
+            // Render gorgeous lined spaces for physical writing in the printed POP document
+            checkPageOverflow(14);
+            doc.setDrawColor(226, 232, 240);
+            doc.setLineWidth(0.2);
+            doc.line(15, currentY + 3, 195, currentY + 3);
+            doc.line(15, currentY + 9, 195, currentY + 9);
+            currentY += 13;
+          }
+          currentY += 1.5;
+        } 
+        else { // short text 'text'
+          const valueStr = meta.value || '';
+          const placeholderStr = meta.placeholder ? `(${meta.placeholder})` : '____________________________________________________________________';
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(10);
+          doc.setTextColor(51, 65, 85);
+          
+          if (valueStr) {
+            doc.text(valueStr, 15, currentY);
+            currentY += 4.5;
+          } else {
+            doc.setTextColor(148, 163, 184);
+            doc.text(placeholderStr, 15, currentY + 1.2);
+            currentY += 5;
+          }
+          currentY += 1.5;
         }
+        
+        currentY += 3; // space between fields
       }
       currentY += 4;
     }
