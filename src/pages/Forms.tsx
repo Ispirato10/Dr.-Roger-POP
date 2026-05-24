@@ -699,12 +699,31 @@ export default function Forms() {
       const printableWidth = pageWidth - (margin * 2);
       let y = 14;
 
-      // Draw Sheet Title
+      // Draw Sheet Title with auto-scaling to prevent overflowing margins
       docPdf.setFont('helvetica', 'bold');
-      docPdf.setFontSize(13);
+      const maxSheetTitleW = printableWidth - 10;
+      let sheetTitleSize = 13;
+      docPdf.setFontSize(sheetTitleSize);
+      let sheetTitleLines = docPdf.splitTextToSize(form.title.toUpperCase(), maxSheetTitleW);
+      
+      if (sheetTitleLines.length > 1) {
+        sheetTitleSize = 11;
+        docPdf.setFontSize(sheetTitleSize);
+        sheetTitleLines = docPdf.splitTextToSize(form.title.toUpperCase(), maxSheetTitleW);
+      }
+      if (sheetTitleLines.length > 2) {
+        sheetTitleSize = 9.5;
+        docPdf.setFontSize(sheetTitleSize);
+        sheetTitleLines = docPdf.splitTextToSize(form.title.toUpperCase(), maxSheetTitleW);
+      }
+      
       docPdf.setTextColor(15, 23, 42); // slate 900
-      docPdf.text(form.title.toUpperCase(), pageWidth / 2, y, { align: 'center' });
-      y += 5;
+      const sheetLineH = sheetTitleSize * 0.3527 * 1.35;
+      sheetTitleLines.forEach((line: string) => {
+        docPdf.text(line, pageWidth / 2, y, { align: 'center' });
+        y += sheetLineH;
+      });
+      y += 1.5;
 
       // Draw Metadata tables like in PDF
       docPdf.setDrawColor(0, 0, 0); // sharp dark borders
@@ -964,15 +983,33 @@ export default function Forms() {
       y += 5;
       
       docPdf.setFont('helvetica', 'bold');
-      docPdf.setFontSize(14);
-      docPdf.text(form.title.toUpperCase(), pageWidth / 2, y, { align: 'center' });
-      y += 4.5;
+      const maxClassicW = printableWidth - 4;
+      let classicFontSize = 14;
+      docPdf.setFontSize(classicFontSize);
+      let classicLines = docPdf.splitTextToSize(form.title.toUpperCase(), maxClassicW);
+      if (classicLines.length > 1) {
+        classicFontSize = 12;
+        docPdf.setFontSize(classicFontSize);
+        classicLines = docPdf.splitTextToSize(form.title.toUpperCase(), maxClassicW);
+      }
+      if (classicLines.length > 2) {
+        classicFontSize = 10;
+        docPdf.setFontSize(classicFontSize);
+        classicLines = docPdf.splitTextToSize(form.title.toUpperCase(), maxClassicW);
+      }
+      
+      const classicLineH = classicFontSize * 0.3527 * 1.3;
+      classicLines.forEach((line: string) => {
+        docPdf.text(line, pageWidth / 2, y, { align: 'center' });
+        y += classicLineH;
+      });
+      y += 2.5;
       
       docPdf.setFont('helvetica', 'normal');
       docPdf.setFontSize(8.5);
       docPdf.setTextColor(64, 64, 64);
       docPdf.text(`CÓDIGO: ${form.code}  |  VERSÃO: ${form.version}.0  |  DATA DE EMISSÃO: ${format(new Date(), 'dd/MM/yyyy')}`, pageWidth / 2, y, { align: 'center' });
-      y += 3.5;
+      y += 4.5;
       
       docPdf.setLineWidth(0.15);
       docPdf.line(margin, y, pageWidth - margin, y);
@@ -981,16 +1018,30 @@ export default function Forms() {
     else if (hStyle === 'minimal') {
       // Ultra-modern minimalist header
       docPdf.setFont('helvetica', 'bold');
-      docPdf.setFontSize(15);
+      const maxMinW = printableWidth - 4;
+      let minimalFontSize = 15;
+      docPdf.setFontSize(minimalFontSize);
+      let minimalLines = docPdf.splitTextToSize(form.title.toUpperCase(), maxMinW);
+      if (minimalLines.length > 1) {
+        minimalFontSize = 13;
+        docPdf.setFontSize(minimalFontSize);
+        minimalLines = docPdf.splitTextToSize(form.title.toUpperCase(), maxMinW);
+      }
+      
       docPdf.setTextColor(15, 23, 42); // slate 900
-      docPdf.text(form.title.toUpperCase(), margin, y + 4);
+      let minimalY = y + 4;
+      const minLineH = minimalFontSize * 0.3527 * 1.3;
+      minimalLines.forEach((line: string) => {
+        docPdf.text(line, margin, minimalY);
+        minimalY += minLineH;
+      });
       
       docPdf.setFont('helvetica', 'normal');
       docPdf.setFontSize(7.5);
       docPdf.setTextColor(100, 116, 139); // slate 500
-      docPdf.text(`${form.code}  •  V${form.version}.0  •  ${drugstore?.name || 'CONTROLE DE QUALIDADE'}`, margin, y + 8.5);
+      docPdf.text(`${form.code}  •  V${form.version}.0  •  ${drugstore?.name || 'CONTROLE DE QUALIDADE'}`, margin, minimalY + 3.5);
       
-      y += 12;
+      y = minimalY + 8;
       docPdf.setDrawColor(226, 232, 240);
       docPdf.setLineWidth(0.2);
       docPdf.line(margin, y, pageWidth - margin, y);
@@ -1005,20 +1056,38 @@ export default function Forms() {
       docPdf.rect(margin, y, printableWidth, 22);
       docPdf.line(margin + 45, y, margin + 45, y + 22); // logo boundary
       docPdf.line(pageWidth - margin - 50, y, pageWidth - margin - 50, y + 22); // metadata boundary
-      docPdf.line(margin + 45, y + 11, pageWidth - margin - 50, y + 11); // divider in center
       
-      // Title Center
+      // Title Center with auto-wrapping and auto-scaling inside the full 22mm height panel
       docPdf.setFont('helvetica', 'bold');
-      docPdf.setFontSize(10.5);
-      docPdf.setTextColor(15, 23, 42);
-      docPdf.text(form.title.toUpperCase(), margin + 45 + (printableWidth - 95)/2, y + 7, { align: 'center' });
+      const maxTitleCellW = (printableWidth - 95) - 6; // 6mm padding total
+      let currentTitleSize = 11;
+      docPdf.setFontSize(currentTitleSize);
+      let titleLines = docPdf.splitTextToSize(form.title.toUpperCase(), maxTitleCellW);
       
-      docPdf.setFont('helvetica', 'normal');
-      docPdf.setFontSize(7.5);
-      docPdf.setTextColor(64, 64, 64);
-      docPdf.text('REGISTRO DE CONTROLE DE SEGURANÇA E AUDITORIA', margin + 45 + (printableWidth - 95)/2, y + 17, { align: 'center' });
+      if (titleLines.length > 2) {
+        currentTitleSize = 9.5;
+        docPdf.setFontSize(currentTitleSize);
+        titleLines = docPdf.splitTextToSize(form.title.toUpperCase(), maxTitleCellW);
+      }
+      if (titleLines.length > 3) {
+        currentTitleSize = 8.0;
+        docPdf.setFontSize(currentTitleSize);
+        titleLines = docPdf.splitTextToSize(form.title.toUpperCase(), maxTitleCellW);
+      }
+
+      docPdf.setTextColor(15, 23, 42);
+      const titleLineHeight = currentTitleSize * 0.3527 * 1.32;
+      const totalTitleHeight = titleLines.length * titleLineHeight;
+      // Vertically center inside the full 22mm height
+      let titleY = y + (22 - totalTitleHeight) / 2 + (currentTitleSize * 0.3527) / 2;
+      
+      titleLines.forEach((line: string) => {
+        docPdf.text(line, margin + 45 + (printableWidth - 95)/2, titleY, { align: 'center' });
+        titleY += titleLineHeight;
+      });
       
       // Metadata Right
+      docPdf.setFont('helvetica', 'normal');
       docPdf.setFontSize(7.5);
       docPdf.text(`CÓDIGO: ${form.code}`, pageWidth - margin - 47, y + 5.5);
       docPdf.text(`VERSÃO: ${form.version}.0`, pageWidth - margin - 47, y + 11);
@@ -1101,20 +1170,53 @@ export default function Forms() {
       // Calculate max vertical dimension required for this row on paper
       let maxRowHeight = 16; // baseline text input height
       rowDef.fields.forEach(f => {
-        let h = 16;
+        const pct = parseInt(f.width || '100', 10);
+        const colWidth = (printableWidth * pct / 100) - 3;
+
+        let labelFontSize = 8.5;
+        if (f.labelSize === 'sm') labelFontSize = 7.5;
+        if (f.labelSize === 'lg') labelFontSize = 10;
+
+        const labelText = `${f.label.toUpperCase()}${f.required ? ' *' : ''}`;
+        
+        // estimate label lines assuming ~1.4mm average char width for Helvetica @ 8.5pt
+        const charsPerLabelLine = Math.floor(colWidth / (labelFontSize * 0.16));
+        const estimatedLabelLines = Math.max(1, Math.ceil(labelText.length / Math.max(10, charsPerLabelLine)));
+        
+        let headerHeight = estimatedLabelLines * (labelFontSize * 0.3527 * 1.35) + 1.5;
+
+        if (f.helpText) {
+          const helpCharsPerLine = Math.floor(colWidth / (7 * 0.15));
+          const estimatedHelpLines = Math.max(1, Math.ceil(f.helpText.length / Math.max(15, helpCharsPerLine)));
+          headerHeight += estimatedHelpLines * (7 * 0.3527 * 1.3) + 1.5;
+        }
+
+        let bodyHeight = 5;
         if (f.type === 'textarea') {
-          h = 10 + ((f.dottedLinesCount || 3) * 6.5);
+          bodyHeight = (f.dottedLinesCount || 3) * 6.5 + 2;
         } else if (f.type === 'signature' || f.maskType === 'stamp_carimbo') {
-          h = 24;
+          bodyHeight = 16;
         } else if (f.maskType === 'patient_data') {
-          h = 36;
+          bodyHeight = 26;
         } else if (f.maskType === 'medicine_info') {
-          h = 32;
+          bodyHeight = 22;
         } else if (f.type === 'checklist') {
           const optsCount = f.options ? f.options.split(/[,;]/).filter(Boolean).length : 1;
-          h = 8 + (optsCount * 6.5);
+          bodyHeight = optsCount * 6.5;
+        } else if (f.type === 'mask') {
+          if (f.maskType === 'temperature' && colWidth < 115) {
+            bodyHeight = 9.5;
+          } else if (f.maskType === 'humidity' && colWidth < 95) {
+            bodyHeight = 9.5;
+          } else if (f.maskType === 'blood_pressure' && colWidth < 90) {
+            bodyHeight = 9.5;
+          } else if (f.maskType === 'blood_glucose' && colWidth < 140) {
+            bodyHeight = 9.5;
+          }
         }
-        if (h > maxRowHeight) maxRowHeight = h;
+
+        const estimatedTotalHeight = headerHeight + bodyHeight + 3;
+        if (estimatedTotalHeight > maxRowHeight) maxRowHeight = estimatedTotalHeight;
       });
 
       checkPageOverflow(maxRowHeight + 5);
@@ -1208,7 +1310,15 @@ export default function Forms() {
     let fieldStartY = y + 5;
     
     if (placement === 'above') {
-      docPdf.text(labelLabel, x, y + 3.5);
+      // Wrap label based on column width
+      const labelLines = docPdf.splitTextToSize(labelLabel, width - 2);
+      const lineH = fontSize * 0.3527 * 1.35; // line height in mm
+      let labelY = y + 3.5;
+      labelLines.forEach((line: string) => {
+        docPdf.text(line, x, labelY);
+        labelY += lineH;
+      });
+      fieldStartY = labelY + 0.5;
     } else if (placement === 'left') {
       docPdf.text(labelLabel, x, y + rowHeight / 2 + 1.2);
     }
@@ -1217,8 +1327,14 @@ export default function Forms() {
       docPdf.setFont('helvetica', 'oblique');
       docPdf.setFontSize(7);
       docPdf.setTextColor(100, 116, 139);
-      docPdf.text(f.helpText, x, y + 7.5);
-      fieldStartY += 4.5;
+      const helpLines = docPdf.splitTextToSize(f.helpText, width - 2);
+      const helpLineH = 7 * 0.3527 * 1.3;
+      let helpY = fieldStartY + 1.5;
+      helpLines.forEach((line: string) => {
+        docPdf.text(line, x, helpY);
+        helpY += helpLineH;
+      });
+      fieldStartY = helpY + 0.5;
     }
 
     const valueY = fieldStartY + 3.5;
@@ -1277,21 +1393,51 @@ export default function Forms() {
     }
     else if (f.type === 'mask') {
       // Print-designed clinical drugstore masks
-      docPdf.setFont('helvetica', 'normal');
-      docPdf.setFontSize(8.5);
       docPdf.setTextColor(51, 65, 85);
 
       if (f.maskType === 'temperature') {
-        docPdf.text('TEMP. ATUAL: _________,___ ºC  |  MIN/MAX: _______ / _______ ºC', x + 2, valueY);
+        docPdf.setFont('helvetica', 'normal');
+        if (width < 115) {
+          docPdf.setFontSize(7.5);
+          docPdf.text('TEMP. ATUAL: _________,___ ºC', x + 2, valueY);
+          docPdf.text('MIN/MÁX: _______ / _______ ºC', x + 2, valueY + 4.5);
+        } else {
+          docPdf.setFontSize(8.5);
+          docPdf.text('TEMP. ATUAL: _________,___ ºC  |  MIN/MÁX: _______ / _______ ºC', x + 2, valueY);
+        }
       } 
       else if (f.maskType === 'humidity') {
-        docPdf.text('UMIDADE RELATIVA DO AR: ____________ % UR', x + 2, valueY);
+        docPdf.setFont('helvetica', 'normal');
+        if (width < 95) {
+          docPdf.setFontSize(7.5);
+          docPdf.text('UMIDADE RELATIVA DO AR:', x + 2, valueY);
+          docPdf.text('____________ % UR', x + 2, valueY + 4.5);
+        } else {
+          docPdf.setFontSize(8.5);
+          docPdf.text('UMIDADE RELATIVA DO AR: ____________ % UR', x + 2, valueY);
+        }
       } 
       else if (f.maskType === 'blood_pressure') {
-        docPdf.text('P.A. REGISTRADA: ________ x ________ mmHg', x + 2, valueY);
+        docPdf.setFont('helvetica', 'normal');
+        if (width < 90) {
+          docPdf.setFontSize(7.5);
+          docPdf.text('P.A. REGISTRADA:', x + 2, valueY);
+          docPdf.text('________ x ________ mmHg', x + 2, valueY + 4.5);
+        } else {
+          docPdf.setFontSize(8.5);
+          docPdf.text('P.A. REGISTRADA: ________ x ________ mmHg', x + 2, valueY);
+        }
       }
       else if (f.maskType === 'blood_glucose') {
-        docPdf.text('GLICEMIA DE PONTA: __________ mg/dL   [  ] Jejum   [  ] Pós-Prandial', x + 2, valueY);
+        docPdf.setFont('helvetica', 'normal');
+        if (width < 140) {
+          docPdf.setFontSize(7.3);
+          docPdf.text('GLICEMIA DE PONTA: __________ mg/dL', x + 2, valueY);
+          docPdf.text('[  ] Jejum   [  ] Pós-Prandial', x + 2, valueY + 4.5);
+        } else {
+          docPdf.setFontSize(8.5);
+          docPdf.text('GLICEMIA DE PONTA: __________ mg/dL   [  ] Jejum   [  ] Pós-Prandial', x + 2, valueY);
+        }
       }
       else if (f.maskType === 'stamp_carimbo') {
         docPdf.setDrawColor(203, 213, 225);
