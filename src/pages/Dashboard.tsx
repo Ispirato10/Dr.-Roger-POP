@@ -16,7 +16,8 @@ import {
   Eye,
   Loader2,
   RefreshCw,
-  CheckCircle2
+  CheckCircle2,
+  ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { POP_TEMPLATES } from '../constants/templates';
@@ -489,6 +490,30 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
+
+      {/* Rodapé com convite sugestivo para o App Dr. Roger de interpretação de receitas */}
+      <footer className="mt-16 pt-8 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left">
+        <div className="flex items-center gap-4 flex-col sm:flex-row">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+            <ExternalLink size={20} />
+          </div>
+          <div>
+            <h4 className="text-sm font-black text-slate-900 tracking-tight leading-none mb-1.5">Conheça o Interpretador Inteligente de Receitas</h4>
+            <p className="text-xs text-slate-500 font-medium leading-relaxed max-w-2xl">
+              Facilite a leitura e análise de prescrições médicas no dia a dia. Acesse o nosso aplicativo inteligente Dr. Roger para obter resumos, alertas automáticos e maior precisão no balcão.
+            </p>
+          </div>
+        </div>
+        <a 
+          href="https://dr-roger.vercel.app" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+        >
+          <span>Scanner de Receita</span>
+          <ArrowRight size={13} />
+        </a>
+      </footer>
     </div>
   );
 }

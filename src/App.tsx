@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { Layout } from './components/Layout';
 import { AuthGuard, RegistrationGuard } from './components/AuthGuard';
+import { SplashIntro } from './components/SplashIntro';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import DrugstoreProfile from './pages/DrugstoreProfile';
@@ -14,8 +15,11 @@ import Prescription from './pages/Prescription';
 import Donation from './pages/Donation';
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
   return (
     <BrowserRouter>
+      {showSplash && <SplashIntro onComplete={() => setShowSplash(false)} />}
       <AuthProvider>
         <Layout>
           <Routes>
