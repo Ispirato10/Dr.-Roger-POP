@@ -48,7 +48,7 @@ export interface CustomFormField {
   id: string;
   label: string;
   type: 'text' | 'textarea' | 'select' | 'checklist' | 'date' | 'signature' | 'mask';
-  maskType?: 'temperature' | 'humidity' | 'blood_pressure' | 'blood_glucose' | 'patient_data' | 'medicine_info' | 'stamp_carimbo';
+  maskType?: 'temperature' | 'humidity' | 'blood_pressure' | 'blood_glucose' | 'patient_data' | 'medicine_info' | 'stamp_carimbo' | 'clinical_care_page1' | 'clinical_care_page2' | 'clinical_care_page3';
   options?: string; // Options separated by commas/semicolons
   width?: '25' | '33' | '50' | '100'; // Multi-column layout capacity
   required?: boolean;
@@ -245,6 +245,19 @@ const STANDARD_PRESETS: any[] = [
       { id: 'f5', label: 'Inspeções de Rotina', type: 'checklist', options: 'Equipamento limpo; Circulação interna livre de caixas; Alarme operacional ativo; Tomada blindada exclusiva protegida; Visto de limpeza semanal', width: '100', required: true },
       { id: 'f6', label: 'Ocorrências e Desvios de Temperatura', type: 'textarea', dottedLinesCount: 3, width: '100' },
       { id: 'f7', label: 'Assinatura e Carimbo Técnico', type: 'mask', maskType: 'stamp_carimbo', width: '100' }
+    ]
+  },
+  {
+    id: 'ficha_atendimento_clinico',
+    title: 'Ficha de Atendimento Farmacêutico',
+    icon: ClipboardCheck,
+    code: 'FOR-ATEND-01',
+    description: 'Documento unificado pelo CFF (Conselho Federal de Farmácia) para Acolhimento, Rastreamento em Saúde, Consulta Farmacêutica e Auriculoterapia.',
+    formLayout: 'standard_form',
+    fields: [
+      { id: 'fa1', label: 'Etapa 1 - Acolhimento (Paciente e Tratamentos)', type: 'mask', maskType: 'clinical_care_page1', width: '100', required: true },
+      { id: 'fa2', label: 'Etapa 2 - Rastreamento em Saúde e Sinais Vitais', type: 'mask', maskType: 'clinical_care_page2', width: '100', required: true },
+      { id: 'fa3', label: 'Etapas 3 e 4 - Consulta Farmacêutica e Auriculoterapia', type: 'mask', maskType: 'clinical_care_page3', width: '100', required: true }
     ]
   }
 ];
@@ -617,7 +630,10 @@ export default function Forms() {
       blood_glucose: 'Teste de Glicemia Capilar',
       patient_data: 'Ficha Cadastral do Paciente',
       medicine_info: 'Medicamento / Vacina Aplicada',
-      stamp_carimbo: 'Espaço para Carimbo Responsável (CRF)'
+      stamp_carimbo: 'Espaço para Carimbo Responsável (CRF)',
+      clinical_care_page1: 'Acolhimento Farmacêutico (Etapa 1)',
+      clinical_care_page2: 'Rastreamento em Saúde (Etapa 2)',
+      clinical_care_page3: 'Consulta e Auriculoterapia (Etapas 3 & 4)'
     };
 
     const labelKey = mask || type;
@@ -626,7 +642,7 @@ export default function Forms() {
       label: defaultLabels[labelKey] || 'Novo Campo Regulado',
       type: type,
       maskType: mask,
-      width: (mask === 'patient_data' || mask === 'medicine_info') ? '100' : '50',
+      width: (mask === 'patient_data' || mask === 'medicine_info' || mask?.startsWith('clinical_care_')) ? '100' : '50',
       required: false,
       dottedLinesCount: 3,
       labelSize: 'sm',
@@ -664,6 +680,401 @@ export default function Forms() {
     setFormFields(fields);
   };
 
+  const buildCustomFichaAtendimento = (form: any, drugstore: any) => {
+    const docPdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const drawPage1 = () => {
+      // Bounding page border
+      docPdf.setDrawColor(148, 163, 184); // Sleeker border color (Slate 400)
+      docPdf.setLineWidth(0.4);
+      docPdf.rect(10, 10, 190, 277);
+
+      // Logos header
+      docPdf.setDrawColor(148, 163, 184);
+      docPdf.rect(12, 12, 186, 22);
+      docPdf.line(52, 12, 52, 34);
+      docPdf.line(158, 12, 158, 34);
+
+      // Left column: Registered drugstore logo!
+      if (drugstore?.logoUrl) {
+        try {
+          docPdf.addImage(drugstore.logoUrl, 'PNG', 14, 14, 36, 18, undefined, 'FAST');
+        } catch (e) {
+          docPdf.setFont('helvetica', 'bold');
+          docPdf.setFontSize(8.5);
+          docPdf.setTextColor(30, 41, 59);
+          docPdf.text(drugstore.name || 'DROGARIA', 32, 23, { align: 'center' });
+        }
+      } else {
+        docPdf.setFont('helvetica', 'bold');
+        docPdf.setFontSize(9);
+        docPdf.setTextColor(15, 23, 42);
+        docPdf.text(drugstore?.name || 'SUA DROGARIA', 32, 20, { align: 'center' });
+        docPdf.setFont('helvetica', 'normal');
+        docPdf.setFontSize(6.5);
+        docPdf.setTextColor(71, 85, 105);
+        docPdf.text(drugstore?.cnpj || 'CNPJ NÃO CADASTRADO', 32, 25, { align: 'center' });
+      }
+
+      // Center Column: Document Title
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(11);
+      docPdf.setTextColor(15, 23, 42);
+      docPdf.text('FICHA DE ATENDIMENTO FARMACÊUTICO', 105, 23.5, { align: 'center' });
+      
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.setFontSize(6.5);
+      docPdf.setTextColor(100, 116, 139);
+      docPdf.text('SERVIÇOS CLÍNICOS INTEGRADOS', 105, 28, { align: 'center' });
+
+      // Right Column: Professional layout
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(8);
+      docPdf.setTextColor(220, 38, 38); // CFF action red
+      docPdf.text('Farmacêuticos', 178, 18.5, { align: 'center' });
+      docPdf.text('em Ação', 178, 22.5, { align: 'center' });
+      
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.setFontSize(6);
+      docPdf.setTextColor(71, 85, 105);
+      docPdf.text('CUIDANDO DE VOCÊ', 178, 28, { align: 'center' });
+
+      // Subtitle Etapa 1 - Light blue/gray slate background box
+      docPdf.setFillColor(241, 245, 249);
+      docPdf.rect(12, 37, 186, 6.5, 'F');
+      docPdf.setDrawColor(203, 213, 225);
+      docPdf.rect(12, 37, 186, 6.5, 'S');
+
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(9.5);
+      docPdf.setTextColor(15, 23, 42);
+      docPdf.text('Etapa 1 - Acolhimento', 105, 41.5, { align: 'center' });
+
+      // Sub-fields for anamnese
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.setFontSize(7.5);
+      docPdf.setTextColor(51, 65, 85);
+      docPdf.setDrawColor(203, 213, 225);
+
+      let currentY = 49;
+      docPdf.text('Nome:', 15, currentY);
+      docPdf.line(25, currentY + 0.5, 150, currentY + 0.5);
+      docPdf.text('Data:', 152, currentY);
+      docPdf.text('      /      /', 160, currentY);
+      docPdf.line(160, currentY + 0.5, 195, currentY + 0.5);
+
+      currentY += 5.5;
+      docPdf.text('Endereço:', 15, currentY);
+      docPdf.line(29, currentY + 0.5, 140, currentY + 0.5);
+      docPdf.text('Telefone:', 142, currentY);
+      docPdf.line(155, currentY + 0.5, 195, currentY + 0.5);
+
+      currentY += 5.5;
+      docPdf.text('Gênero: (  ) F   (  ) M   (  ) Outro', 15, currentY);
+      docPdf.text('Idade:', 110, currentY);
+      docPdf.line(120, currentY + 0.5, 145, currentY + 0.5);
+
+      currentY += 5.5;
+      docPdf.text('Problema(s) de saúde: (  ) Diabetes   (  ) Hipertensão   (  ) Asma   (  ) Dislipidemia   (  ) Outro(s):', 15, currentY);
+      docPdf.line(134, currentY + 0.5, 195, currentY + 0.5);
+
+      currentY += 5.5;
+      docPdf.text('Tem alguém na família com: (  ) Diabetes   (  ) Hipertensão   (  ) Asma   (  ) Outro(s):', 15, currentY);
+      docPdf.line(128, currentY + 0.5, 195, currentY + 0.5);
+
+      currentY += 5.5;
+      docPdf.text('Quem?', 15, currentY);
+      docPdf.line(25, currentY + 0.5, 195, currentY + 0.5);
+
+      currentY += 5.5;
+      docPdf.text('Você fuma? (  ) Sim   (  ) Não', 15, currentY);
+      docPdf.text('Fumante passivo? (  ) Sim   (  ) Não', 105, currentY);
+
+      currentY += 5.5;
+      docPdf.text('Você trouxe? (  ) Medicamentos   (  ) Receitas   (  ) Laudos de exames', 15, currentY);
+
+      currentY += 5.5;
+      docPdf.text('Você faz uso de algum medicamento? (  ) Sim   (  ) Não', 15, currentY);
+
+      currentY += 5.5;
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setTextColor(30, 41, 59);
+      docPdf.text('Caso a resposta seja sim, preencher o quadro abaixo de acordo com o relato do paciente:', 15, currentY);
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.setTextColor(51, 65, 85);
+
+      // Table row counts
+      currentY += 3;
+      docPdf.setFillColor(254, 252, 232); // Beautiful subtle clinical yellow background
+      docPdf.rect(15, currentY, 176, 6, 'F');
+      docPdf.setDrawColor(203, 213, 225);
+      docPdf.rect(15, currentY, 176, 28, 'S');
+
+      // Header labels
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(6.2);
+      docPdf.setTextColor(30, 41, 59);
+      docPdf.text('Medicamento', 38.5, currentY + 4, { align: 'center' });
+      docPdf.text('Concentração', 73.5, currentY + 4, { align: 'center' });
+      docPdf.text('Posologia\n(1-0-1 / SN)', 97.5, currentY + 3.2, { align: 'center' });
+      docPdf.text('Como usa (com refeição /\nágua / leite / jejum / partido)', 136, currentY + 3.2, { align: 'center' });
+      docPdf.text('Indicação', 179, currentY + 4, { align: 'center' });
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.setTextColor(51, 65, 85);
+
+      // Dividers
+      docPdf.line(62, currentY, 62, currentY + 28);
+      docPdf.line(85, currentY, 85, currentY + 28);
+      docPdf.line(110, currentY, 110, currentY + 28);
+      docPdf.line(162, currentY, 162, currentY + 28);
+
+      let rowY = currentY + 6;
+      for (let j = 0; j < 4; j++) {
+        docPdf.line(15, rowY, 191, rowY);
+        rowY += 5.5;
+      }
+
+      currentY += 31.5;
+      docPdf.setFontSize(7.5);
+      docPdf.text('O paciente usa:  (  ) Injetável   (  ) Dispositivos inalatórios   (  ) Aparelhos de aplicação nasal   (  ) Colírio   (  ) Creme vaginal   (  ) Outro', 15, currentY);
+
+      currentY += 5.5;
+      docPdf.text('Na sua casa, em que lugar os medicamentos são guardados?  (  ) Adequado   (  ) Inadequado: ____________________', 15, currentY);
+      docPdf.line(146, currentY + 0.5, 195, currentY + 0.5);
+
+      currentY += 5.5;
+      docPdf.text('O que é feito com os medicamentos vencidos ou fora de uso?  (  ) Adequado   (  ) Inadequado: __________________', 15, currentY);
+      docPdf.line(146, currentY + 0.5, 195, currentY + 0.5);
+
+      currentY += 5.5;
+      docPdf.text('OBS.:', 15, currentY);
+      docPdf.line(24, currentY + 0.5, 195, currentY + 0.5);
+      currentY += 5.5;
+      docPdf.line(15, currentY + 0.5, 195, currentY + 0.5);
+
+      // Section 2 Rastreamento
+      currentY += 7;
+      docPdf.setFillColor(241, 245, 249);
+      docPdf.rect(12, currentY, 186, 6.5, 'F');
+      docPdf.setDrawColor(203, 213, 225);
+      docPdf.rect(12, currentY, 186, 6.5, 'S');
+
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(9.5);
+      docPdf.setTextColor(15, 23, 42);
+      docPdf.text('Etapa 2 - Rastreamento em saúde', 105, currentY + 4.5, { align: 'center' });
+
+      currentY += 10;
+      const scrStarts = [15, 43, 81, 166];
+      docPdf.setFillColor(254, 252, 232);
+      docPdf.rect(15, currentY, 176, 5.5, 'F');
+      docPdf.rect(15, currentY, 176, 68, 'S');
+
+      docPdf.line(scrStarts[1], currentY, scrStarts[1], currentY + 68);
+      docPdf.line(scrStarts[2], currentY, scrStarts[2], currentY + 68);
+      docPdf.line(scrStarts[3], currentY, scrStarts[3], currentY + 68);
+
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(6.5);
+      docPdf.setTextColor(30, 41, 59);
+      docPdf.text('Parâmetro', 29, currentY + 3.8, { align: 'center' });
+      docPdf.text('Resultado', 62, currentY + 3.8, { align: 'center' });
+      docPdf.text('Critério de encaminhamento para a consulta farmacêutica', 123.5, currentY + 3.8, { align: 'center' });
+      docPdf.text('Resultado alterado?', 178.5, currentY + 3.8, { align: 'center' });
+
+      let crY = currentY + 5.5;
+      const rowsDef = [
+        { label: 'Pressão arterial', res: '______________ mmHg', crit: '>= 140/90 mmHg', h: 7 },
+        { label: 'Frequência cardíaca', res: '______________ bpm', crit: '(  ) >= 101 ou <= 49 bpm, sem insuficiência cardíaca\n(  ) >= 71 bpm, com insuficiência cardíaca', h: 10 },
+        { label: 'Colesterol total', res: '______________ mg/dL', crit: '>= 190 mg/dL', h: 7 },
+        { label: 'Glicemia capilar', res: '______________ mg/dL', crit: '(  ) >= 100 mg/dL, se jejum >= 8 h\n(  ) >= 140 mg/dL, se jejum de 2 a 8 h\n(  ) >= 200 mg/dL (glicemia casual/independente de jejum)', h: 15 },
+        { label: 'HbA1c', res: '______________ %', crit: '(  ) >= 5,7%, sem diagnóstico prévio de diabetes\n(  ) >= 6,5%, com diagnóstico prévio de diabetes', h: 11 },
+        { label: 'Peak flow', res: '1. _________  2. _________\n3. _________ L/min\nRes. final: ___________ %', crit: '<= 79%', h: 12.5 }
+      ];
+
+      rowsDef.forEach((row) => {
+        docPdf.setFont('helvetica', 'normal');
+        docPdf.setFontSize(7);
+        docPdf.setTextColor(51, 65, 85);
+        docPdf.setDrawColor(203, 213, 225);
+        docPdf.line(15, crY, 191, crY);
+
+        docPdf.setFont('helvetica', 'bold');
+        docPdf.setTextColor(30, 41, 59);
+        docPdf.text(row.label, 16.5, crY + 4.5);
+        docPdf.setFont('helvetica', 'normal');
+        docPdf.setTextColor(51, 65, 85);
+
+        const resLines = row.res.split('\n');
+        let resL_Y = crY + 4;
+        resLines.forEach(l => {
+          docPdf.text(l, scrStarts[1] + 2, resL_Y);
+          resL_Y += 3.8;
+        });
+
+        docPdf.setFontSize(6);
+        const critLines = row.crit.split('\n');
+        let critL_Y = crY + 3.5;
+        critLines.forEach(l => {
+          docPdf.text(l, scrStarts[2] + 2, critL_Y);
+          critL_Y += 3.5;
+        });
+
+        docPdf.setFontSize(7);
+        docPdf.text('(  ) Sim\n(  ) Não', scrStarts[3] + 4, crY + (row.h/2) - 1.2);
+        crY += row.h;
+      });
+
+      let lastY = crY + 4;
+      docPdf.setFontSize(7.5);
+      docPdf.text('Tempo de jejum:  (  ) >= 8 h   (  ) 2 a 8 h   (  ) >= 2 h / casual', 15, lastY);
+
+      lastY += 4.5;
+      docPdf.text('Paciente polimedicado (uso de 5 ou mais medicamentos):  (  ) Sim   (  ) Não', 15, lastY);
+
+      lastY += 4.5;
+      docPdf.text('Necessidade de orientação especial sobre forma farmacêutica:  (  ) Sim   (  ) Não', 15, lastY);
+
+      lastY += 4.5;
+      docPdf.text('Necessidade de consulta farmacêutica:  (  ) Sim   (  ) Não', 15, lastY);
+
+      lastY += 4.5;
+      docPdf.text('OBS.:', 15, lastY);
+      docPdf.line(24, lastY + 0.5, 191, lastY + 0.5);
+      lastY += 4.5;
+      docPdf.line(15, lastY + 0.5, 191, lastY + 0.5);
+
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(5.5);
+      docPdf.setTextColor(148, 163, 184); // soft slate border gray
+      docPdf.text('Responsável pelo atendimento', 7.5, 95, { angle: 90, align: 'center' });
+      docPdf.text('Responsável pelo atendimento', 7.5, 230, { angle: 90, align: 'center' });
+    };
+
+    const drawPage2 = () => {
+      docPdf.addPage();
+      docPdf.setDrawColor(148, 163, 184);
+      docPdf.setLineWidth(0.4);
+      docPdf.rect(10, 10, 190, 277);
+
+      let p2Y = 16;
+      docPdf.setFillColor(241, 245, 249);
+      docPdf.rect(12, p2Y - 1, 186, 6.5, 'F');
+      docPdf.setDrawColor(203, 213, 225);
+      docPdf.rect(12, p2Y - 1, 186, 6.5, 'S');
+
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(9.5);
+      docPdf.setTextColor(15, 23, 42);
+      docPdf.text('Etapa 3 - Consulta farmacêutica', 105, p2Y + 3.5, { align: 'center' });
+
+      p2Y += 12;
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(8.5);
+      docPdf.setTextColor(30, 41, 59);
+      docPdf.text('3.1 Avaliação (identificação de problemas)', 13, p2Y);
+
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.setFontSize(7.5);
+      docPdf.setTextColor(51, 65, 85);
+
+      const evalPoints = [
+        'Condição clínica que necessita de elucidação diagnóstica por médico:  (  ) Sim   (  ) Não   Qual? __________________________________',
+        'Condição clínica previamente diagnosticada e descontrolada:  (  ) Sim   (  ) Não   Qual? ____________________________________',
+        'Necessidade de terapia adicional prescrita por médico:  (  ) Sim   (  ) Não   Qual? _______________ Para o que? ___________',
+        'Medicamento cuja indicação requer reavaliação:  (  ) Prescrito   Qual? _______________________________________________',
+        'Problemas na posologia (dose alta/baixa, horário de administração, etc):  (  ) Sim   (  ) Não   Qual? ____________________________',
+        'Necessidade de manejo de problema de saúde autolimitado:  (  ) Sim   (  ) Não   Qual? ______________________________________',
+        'Automedicação indevida  Qual? ____________________________________________________________________________________',
+        'Não adesão ao tratamento:  (  ) Intencional   (  ) Não intencional   Descrever motivo da não adesão e qual medicamento envolvido: _________',
+        'Reação adversa a Medicamento:  (  ) Sim   (  ) Não   Qual? __________________________________________________________',
+        'Baixo conhecimento do paciente:  (  ) Doença   (  ) Tratamento   Descrever: __________________________________________________',
+        'Outros problemas:  (  ) Sim   (  ) Não   Quais? ________________________________________________________________________',
+        'Observações adicionais ___________________________________________________________________________________________'
+      ];
+
+      p2Y += 5;
+      evalPoints.forEach((point) => {
+        docPdf.setTextColor(148, 163, 184);
+        docPdf.text('•', 14, p2Y);
+        docPdf.setTextColor(51, 65, 85);
+        docPdf.text(point, 18, p2Y);
+        p2Y += 7.2;
+      });
+
+      docPdf.setDrawColor(226, 232, 240);
+      docPdf.line(14, p2Y + 0.5, 194, p2Y + 0.5);
+      p2Y += 5.5;
+      docPdf.line(14, p2Y + 0.5, 194, p2Y + 0.5);
+
+      p2Y += 9;
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(8.5);
+      docPdf.setTextColor(30, 41, 59);
+      docPdf.text('3.2 Plano de Cuidado (Intervenções realizadas):', 13, p2Y);
+
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.setFontSize(7.5);
+      docPdf.setTextColor(51, 65, 85);
+
+      const carePoints = [
+        '(  ) Aconselhamento sobre doenças',
+        '(  ) Aconselhamento sobre hábitos de vida saudável',
+        '(  ) Aconselhamento sobre o tratamento',
+        '(  ) Aconselhamento sobre o uso de alguma forma farmacêutica',
+        '(  ) Entrega de calendário posológico',
+        '(  ) Entrega de seletor de locais para aplicação de insulina e outros materiais para pessoas insulinizadas',
+        '(  ) Prescrição de medidas não farmacológicas ________________________________________________________________________',
+        '    ________________________________________________________________________________________________________________',
+        '(  ) Prescrição de medicamentos isentos de prescrição médica __________________________________________________________',
+        '    ________________________________________________________________________________________________________________',
+        '(  ) Encaminhamento: ____________________________________________________________________________________________',
+        '(  ) Encaminhamento para serviço de urgência/emergência ____________________________________________________________',
+        '(  ) Outra? Qual? ________________________________________________________________________________________________'
+      ];
+
+      p2Y += 4.5;
+      carePoints.forEach((point) => {
+        docPdf.text(point, 15, p2Y);
+        p2Y += 6.5;
+      });
+
+      p2Y += 5;
+      docPdf.setFillColor(241, 245, 249);
+      docPdf.rect(12, p2Y - 1, 186, 6.5, 'F');
+      docPdf.setDrawColor(203, 213, 225);
+      docPdf.rect(12, p2Y - 1, 186, 6.5, 'S');
+
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(9.5);
+      docPdf.setTextColor(15, 23, 42);
+      docPdf.text('Etapa 4 - Auriculoterapia', 105, p2Y + 3.5, { align: 'center' });
+
+      p2Y += 12;
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.setFontSize(7.5);
+      docPdf.setTextColor(51, 65, 85);
+      docPdf.text('Responsável pelo atendimento: _______________________________________________________________________________________', 13, p2Y);
+      
+      p2Y += 5.5;
+      docPdf.text('OBS.: _______________________________________________________________________________________________________________', 13, p2Y);
+
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(5.5);
+      docPdf.setTextColor(148, 163, 184);
+      docPdf.text('Responsável pelo atendimento', 196.5, 140, { angle: 270, align: 'center' });
+    };
+
+    drawPage1();
+    drawPage2();
+
+    return docPdf;
+  };
+
   // Pure PDF generator engine that supports both download and real-time iframe previews
   const buildPDF = (form: { 
     title: string; 
@@ -683,6 +1094,10 @@ export default function Forms() {
     watermarkText?: string;
     gridRowsCount?: number;
   }) => {
+    if (form.code === 'FOR-ATEND-01' || form.title.toLowerCase().includes('atendimento farmacêutico')) {
+      return buildCustomFichaAtendimento(form, drugstore);
+    }
+
     const isLandscape = form.orientation === 'landscape';
     
     // 1. Specialized Grid Layout mapping requested in the PDF
@@ -1203,6 +1618,12 @@ export default function Forms() {
         } else if (f.type === 'checklist') {
           const optsCount = f.options ? f.options.split(/[,;]/).filter(Boolean).length : 1;
           bodyHeight = optsCount * 6.5;
+        } else if (f.maskType === 'clinical_care_page1') {
+          bodyHeight = 110;
+        } else if (f.maskType === 'clinical_care_page2') {
+          bodyHeight = 100;
+        } else if (f.maskType === 'clinical_care_page3') {
+          bodyHeight = 140;
         } else if (f.type === 'mask') {
           if (f.maskType === 'temperature' && colWidth < 115) {
             bodyHeight = 9.5;
@@ -1458,6 +1879,30 @@ export default function Forms() {
         docPdf.text('NOME PACIENTE: ______________________________________________________________', x + 3, fieldStartY + 5.5);
         docPdf.text('CPF: ______.______.___ - ___   CONTATO: (___) ____________________ FONE', x + 3, fieldStartY + 13.5);
         docPdf.text('IDADE: ______ ANOS     SEXO: [  ] MASCULINO   [  ] FEMINININO', x + 3, fieldStartY + 21.5);
+      }
+      else if (f.maskType === 'clinical_care_page1') {
+        docPdf.setDrawColor(226, 232, 240);
+        docPdf.rect(x, fieldStartY, width, 25);
+        docPdf.setFont('helvetica', 'normal');
+        docPdf.setFontSize(8);
+        docPdf.setTextColor(71, 85, 105);
+        docPdf.text('[ Bloco Especial: Etapa 1 - Acolhimento Farmacêutico ]', x + 5, fieldStartY + 12);
+      }
+      else if (f.maskType === 'clinical_care_page2') {
+        docPdf.setDrawColor(226, 232, 240);
+        docPdf.rect(x, fieldStartY, width, 25);
+        docPdf.setFont('helvetica', 'normal');
+        docPdf.setFontSize(8);
+        docPdf.setTextColor(71, 85, 105);
+        docPdf.text('[ Bloco Especial: Etapa 2 - Rastreamento em Saúde ]', x + 5, fieldStartY + 12);
+      }
+      else if (f.maskType === 'clinical_care_page3') {
+        docPdf.setDrawColor(226, 232, 240);
+        docPdf.rect(x, fieldStartY, width, 25);
+        docPdf.setFont('helvetica', 'normal');
+        docPdf.setFontSize(8);
+        docPdf.setTextColor(71, 85, 105);
+        docPdf.text('[ Bloco Especial: Etapas 3 & 4 - Consulta & Auriculoterapia ]', x + 5, fieldStartY + 12);
       }
       else if (f.maskType === 'medicine_info') {
         docPdf.setDrawColor(226, 232, 240);
@@ -2202,6 +2647,27 @@ export default function Forms() {
                           </button>
                           <button
                             type="button"
+                            onClick={() => handleAddFieldSetting('mask', 'clinical_care_page1')}
+                            className="flex items-center gap-2 p-2 bg-slate-50 hover:bg-slate-100 border border-indigo-250 rounded-lg text-left text-[11px] font-bold text-slate-700 transition-colors"
+                          >
+                            <ClipboardCheck size={14} className="text-violet-600" /> Acolhimento Farmacêutico (Etapa 1)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAddFieldSetting('mask', 'clinical_care_page2')}
+                            className="flex items-center gap-2 p-2 bg-slate-50 hover:bg-slate-100 border border-indigo-250 rounded-lg text-left text-[11px] font-bold text-slate-700 transition-colors"
+                          >
+                            <Activity size={14} className="text-violet-600" /> Rastreamento em Saúde (Etapa 2)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAddFieldSetting('mask', 'clinical_care_page3')}
+                            className="flex items-center gap-2 p-2 bg-slate-50 hover:bg-slate-100 border border-indigo-250 rounded-lg text-left text-[11px] font-bold text-slate-700 transition-colors"
+                          >
+                            <ClipboardCheck size={14} className="text-violet-600" /> Consulta & Auriculoterapia (Etapas 3 & 4)
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleAddFieldSetting('mask', 'medicine_info')}
                             className="flex items-center gap-2 p-2 bg-slate-50 hover:bg-slate-100 border border-indigo-200 rounded-lg text-left text-[11px] font-bold text-slate-700 transition-colors"
                           >
@@ -2821,6 +3287,201 @@ export default function Forms() {
                             </div>
                           </div>
                         </div>
+                      ) : (formCode === 'FOR-ATEND-01' || formTitle.toUpperCase().includes('ATENDIMENTO FARMACÊUTICO')) ? (
+                        <div className="text-[7.2px] space-y-4 text-slate-700 h-full overflow-y-auto max-h-[720px] select-none pr-1 bg-white p-4 font-mono leading-normal rounded shadow border w-full">
+                          {/* Rich high-fidelity preview matching the PDF! */}
+                          <div className="border border-slate-900 p-2 space-y-3 relative bg-slate-50/10">
+                            <span className="absolute top-1 right-2 bg-indigo-600 text-[6.5px] text-white px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Simulador Página 1</span>
+                            
+                            {/* Header grid */}
+                            <div className="border border-slate-400 grid grid-cols-4 bg-white text-[7.5px] text-center font-bold">
+                              <div className="border-r border-slate-350 p-1 flex flex-col justify-center text-slate-800 leading-tight">
+                                <span>CONSELHO</span>
+                                <span>FEDERAL DE</span>
+                                <span>FARMÁCIA</span>
+                              </div>
+                              <div className="border-r border-slate-350 col-span-2 p-1 text-[9px] font-black text-indigo-950 flex items-center justify-center tracking-tight leading-snug">
+                                {formTitle.toUpperCase()}
+                              </div>
+                              <div className="p-1 flex flex-col justify-center text-red-600 leading-tight">
+                                <span className="text-[7px]">Farmacêuticos</span>
+                                <span className="text-[7px]">em Ação</span>
+                                <span className="text-[5.5px] italic text-slate-500">CUIDANDO DE VOCÊ</span>
+                              </div>
+                            </div>
+
+                            {/* Section 1 Title */}
+                            <div className="text-center font-bold text-[8.5px] text-zinc-950 border-b border-slate-400 pb-0.5 uppercase tracking-wide">
+                              Etapa 1 - Acolhimento
+                            </div>
+
+                            {/* Section 1 Inputs */}
+                            <div className="space-y-1 bg-white p-2 rounded border border-slate-200 text-slate-600 text-[6.5px]">
+                              <div>Nome: ____________________________________________________________________ Data: ___/___/___</div>
+                              <div>Endereço: _____________________________________________________________ Telefone: ______________</div>
+                              <div>Gênero: [ ] F  [ ] M  [ ] Outro      Idade: _________</div>
+                              <div>Problema(s) de saúde: [ ] Diabetes  [ ] Hipertensão  [ ] Asma  [ ] Dislipidemia  [ ] Outro(s): _________________</div>
+                              <div>Tem alguém na família com: [ ] Diabetes  [ ] Hipertensão  [ ] Asma  [ ] Outro(s): ________________________</div>
+                              <div>Quem? _________________________________________________________________________________________________</div>
+                              <div>Você fuma? [ ] Sim  [ ] Não         Fumante passivo? [ ] Sim  [ ] Não</div>
+                              <div>Você trouxe? [ ] Medicamentos   [ ] Receitas   [ ] Laudos de exames</div>
+                              <div>Você faz uso de algum medicamento? [ ] Sim  [ ] Não</div>
+                              <div className="font-bold pt-1 text-slate-800">Caso a resposta seja sim, preencher o quadro abaixo de acordo com o relato do paciente:</div>
+                            </div>
+
+                            {/* Pharmacotherapy table preview */}
+                            <div className="border border-slate-350 bg-white rounded overflow-hidden">
+                              <div className="grid grid-cols-12 bg-amber-50/70 border-b border-slate-350 p-1 text-[6px] font-bold text-center">
+                                <span className="col-span-4 border-r border-slate-300">Medicamento</span>
+                                <span className="col-span-2 border-r border-slate-300">Concentração</span>
+                                <span className="col-span-2 border-r border-slate-300">Posologia</span>
+                                <span className="col-span-2 border-r border-slate-300">Como usa</span>
+                                <span className="col-span-2">Indicação</span>
+                              </div>
+                              {Array.from({ length: 4 }).map((_, rIdx) => (
+                                <div key={rIdx} className="grid grid-cols-12 border-b border-slate-200 p-1 text-slate-300 text-center text-[5.8px]">
+                                  <div className="col-span-4 border-r border-slate-200">_____________________________</div>
+                                  <div className="col-span-2 border-r border-slate-200">__________</div>
+                                  <div className="col-span-2 border-r border-slate-200">__________</div>
+                                  <div className="col-span-2 border-r border-slate-200">___________________</div>
+                                  <div className="col-span-2">__________</div>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Rest of Section 1 */}
+                            <div className="space-y-1 bg-white p-2 border border-slate-200 text-slate-650 text-[6.5px]">
+                              <div>O paciente usa: [ ] Injetável   [ ] Dispositivos inalatórios   [ ] Aplicação nasal   [ ] Colírio   [ ] Outro</div>
+                              <div>Na sua casa, onde guarda os medicamentos? [ ] Adequado   [ ] Inadequado: __________________________________</div>
+                              <div>O que é feito com medicamentos vencidos? [ ] Adequado   [ ] Inadequado: ___________________________________</div>
+                              <div>OBS: _______________________________________________________________________________________________</div>
+                            </div>
+
+                            {/* Section 2 Header */}
+                            <div className="text-center font-bold text-[8.5px] text-zinc-950 border-b border-slate-400 pb-0.5 mt-2 uppercase tracking-wide">
+                              Etapa 2 - Rastreamento em Saúde
+                            </div>
+
+                            {/* Parameters Table preview */}
+                            <div className="border border-slate-350 bg-white rounded overflow-hidden">
+                              <div className="grid grid-cols-12 bg-amber-50/70 border-b border-slate-350 p-1 text-[6px] font-bold text-center">
+                                <span className="col-span-3 border-r border-slate-300">Parâmetro</span>
+                                <span className="col-span-3 border-r border-slate-300">Resultado</span>
+                                <span className="col-span-4 border-r border-slate-300">Critério de Encaminhamento</span>
+                                <span className="col-span-2">Alterado?</span>
+                              </div>
+                              <div className="grid grid-cols-12 border-b border-slate-200 p-1 text-[5.8px] items-center text-slate-700">
+                                <div className="col-span-3 border-r border-slate-200 font-bold pl-1">Pressão Arterial</div>
+                                <div className="col-span-3 border-r border-slate-200 text-slate-400 pl-1">_______ x _______ mmHg</div>
+                                <div className="col-span-4 border-r border-slate-200 text-rose-700 font-bold pl-1">&ge; 140/90 mmHg</div>
+                                <div className="col-span-2 text-center text-slate-405">[ ] Sim  [ ] Não</div>
+                              </div>
+                              <div className="grid grid-cols-12 border-b border-slate-200 p-1 text-[5.8px] items-center text-slate-700">
+                                <div className="col-span-3 border-r border-slate-200 font-bold pl-1">Frequência Cardíaca</div>
+                                <div className="col-span-3 border-r border-slate-200 text-slate-400 pl-1">_______ bpm</div>
+                                <div className="col-span-4 border-r border-slate-200 pl-1 text-[5.3px] leading-tight text-slate-500">
+                                  [ ] &ge;101 ou &le;49 bpm, s/ ins. cardíaca<br/>
+                                  [ ] &ge;71 bpm, c/ ins. cardíaca
+                                </div>
+                                <div className="col-span-2 text-center text-slate-405">[ ] Sim  [ ] Não</div>
+                              </div>
+                              <div className="grid grid-cols-12 border-b border-slate-200 p-1 text-[5.8px] items-center text-slate-700">
+                                <div className="col-span-3 border-r border-slate-200 font-bold pl-1">Colesterol Total</div>
+                                <div className="col-span-3 border-r border-slate-200 text-slate-400 pl-1">_______ mg/dL</div>
+                                <div className="col-span-4 border-r border-slate-200 text-rose-700 font-bold pl-1">&ge; 190 mg/dL</div>
+                                <div className="col-span-2 text-center text-slate-405">[ ] Sim  [ ] Não</div>
+                              </div>
+                              <div className="grid grid-cols-12 border-b border-slate-200 p-1 text-[5.8px] items-center text-slate-700">
+                                <div className="col-span-3 border-r border-slate-200 font-bold pl-1">Glicemia Capilar</div>
+                                <div className="col-span-3 border-r border-slate-200 text-slate-400 pl-1">_______ mg/dL</div>
+                                <div className="col-span-4 border-r border-slate-200 pl-1 text-[5.3px] leading-tight text-slate-500">
+                                  [ ] &ge;100 mg/dL se jejum &gt;8h<br/>
+                                  [ ] &ge;140 mg/dL se jejum de 2a8h<br/>
+                                  [ ] &ge;200 mg/dL independente de jejum
+                                </div>
+                                <div className="col-span-2 text-center text-slate-405">[ ] Sim  [ ] Não</div>
+                              </div>
+                              <div className="grid grid-cols-12 border-b border-slate-200 p-1 text-[5.8px] items-center text-slate-700">
+                                <div className="col-span-3 border-r border-slate-200 font-bold pl-1">HbA1c</div>
+                                <div className="col-span-3 border-r border-slate-200 text-slate-400 pl-1">_______ %</div>
+                                <div className="col-span-4 border-r border-slate-200 pl-1 text-[5.3px] leading-tight text-slate-500">
+                                  [ ] &ge;5.7% sem diagn. prévio de diabetes<br/>
+                                  [ ] &ge;6.5% com diagn. prévio de diabetes
+                                </div>
+                                <div className="col-span-2 text-center text-slate-405">[ ] Sim  [ ] Não</div>
+                              </div>
+                              <div className="grid grid-cols-12 p-1 text-[5.8px] items-center text-slate-700">
+                                <div className="col-span-3 border-r border-slate-200 font-bold pl-1">Peak Flow</div>
+                                <div className="col-span-3 border-r border-slate-200 text-slate-400 text-[5.3px] leading-tight pl-1">
+                                  1. _____  2. _____  3. _____ l/min<br/>
+                                  Resultado final: ______%
+                                </div>
+                                <div className="col-span-4 border-r border-slate-200 text-rose-700 font-bold pl-1">&le; 79%</div>
+                                <div className="col-span-2 text-center text-slate-405">[ ] Sim  [ ] Não</div>
+                              </div>
+                            </div>
+
+                            {/* Under Screening table */}
+                            <div className="space-y-1 bg-white p-2 border border-slate-200 text-slate-600 text-[6.5px]">
+                              <div>Tempo de jejum: [ ] &ge; 8h  [ ] 2 a 8h  [ ] &ge; 2h / casual</div>
+                              <div>Paciente polimedicado (5 ou mais meds): [ ] Sim  [ ] Não</div>
+                              <div>Idôneo para uso correto da forma farmacêutica: [ ] Sim  [ ] Não</div>
+                              <div>OBS: _______________________________________________________________________________________________</div>
+                            </div>
+                          </div>
+
+                          {/* Page 2 border */}
+                          <div className="border border-slate-900 p-2 space-y-3 relative bg-slate-50/10">
+                            <span className="absolute top-1 right-2 bg-indigo-600 text-[6.5px] text-white px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Simulador Página 2</span>
+                            
+                            {/* Section 3 Header */}
+                            <div className="text-center font-bold text-[8.5px] text-zinc-950 border-b border-slate-400 pb-0.5 uppercase tracking-wide">
+                              Etapa 3 - Consulta Farmacêutica
+                            </div>
+
+                            {/* Subsection 3.1 Assessments */}
+                            <div className="space-y-1 bg-white p-2 border border-slate-200 text-slate-650 text-[6px]">
+                              <div className="font-bold text-[7px] text-indigo-900 pb-0.5">3.1 Avaliação (identificação de problemas)</div>
+                              <div>&bull; Reclamação que necessita de esclarecimento médico? [ ] Sim  [ ] Não  Qual: __________________</div>
+                              <div>&bull; Tratamento atual descontrolado? [ ] Sim  [ ] Não  Qual: ___________________________</div>
+                              <div>&bull; Falta tratamento para alguma condição? [ ] Sim  [ ] Não  Qual: ________________________</div>
+                              <div>&bull; Medicamento desnecessário / sem indicação? [ ] Sim  [ ] Não  Qual: _______________________</div>
+                              <div>&bull; Problema posológico (frequência/dose)? [ ] Sim  [ ] Não  Qual: ____________________________</div>
+                              <div>&bull; Problema de saúde autolimitado sem tratamento? [ ] Sim  [ ] Não  Qual: ______________________</div>
+                              <div>&bull; Prática inadequada de automedicação? Qual: _______________________________________________</div>
+                              <div>&bull; Não adesão ao tratamento: [ ] Intencional  [ ] Não intencional  Motivo: ______________________</div>
+                              <div>&bull; Suspeita de reação adversa a medicamento (RAM)? [ ] Sim  [ ] Não  Qual: ______________________</div>
+                              <div>&bull; Baixo conhecimento do paciente: [ ] Doença  [ ] Uso medicamentos  Qual: ____________________</div>
+                              <div>&bull; Observações adicionais: _______________________________________________________________________</div>
+                              <div>_______________________________________________________________________________________________</div>
+                            </div>
+
+                            {/* Subsection 3.2 Care Plan */}
+                            <div className="space-y-1 bg-white p-2 border border-slate-200 text-slate-650 text-[6px]">
+                              <div className="font-bold text-[7px] text-indigo-900 pb-0.5">3.2 Plano de Cuidado (Intervenções realizadas)</div>
+                              <div>[ ] Orientação sobre a patologia descrita</div>
+                              <div>[ ] Orientação sobre estilo de vida / hábitos saudáveis</div>
+                              <div>[ ] Orientação detalhada quanto ao uso dos medicamentos</div>
+                              <div>[ ] Elaboração e entrega de tabela de horários (calendário posológico)</div>
+                              <div>[ ] Treinamento para uso correto e locais de aplicação de insulina / injetáveis</div>
+                              <div>[ ] Prescrição de terapia não farmacológica: _____________________________________________________</div>
+                              <div>[ ] Prescrição de Medicamentos Isentos de Prescrição Médica (MIPs): __________________________</div>
+                              <div>[ ] Encaminhamento médico ou serviço de urgência: ____________________________________________</div>
+                            </div>
+
+                            {/* Section 4 Header */}
+                            <div className="text-center font-bold text-[8.5px] text-zinc-950 border-b border-slate-400 pb-0.5 update uppercase tracking-wide">
+                              Etapa 4 - Auriculoterapia
+                            </div>
+
+                            {/* Section 4 items */}
+                            <div className="space-y-1 bg-white p-2 border border-slate-200 text-slate-650 text-[6.5px]">
+                              <div>Pontos auriculares aplicados: ______________________________________________________________________</div>
+                              <div>Observações complementares: ________________________________________________________________________</div>
+                              <div>Responsável pelo atendimento: _____________________________________________________________________</div>
+                            </div>
+                          </div>
+                        </div>
                       ) : (
                         <>
                           {/* HEADER PREVIEW DYNAMIC */}
@@ -3000,6 +3661,24 @@ export default function Forms() {
                                     {field.maskType === 'stamp_carimbo' && (
                                       <div className="border border-dashed border-slate-300 rounded p-2 text-center text-[7px] text-slate-400 italic">
                                         ESPAÇO RESERVADO CARIMBO CRF / MEDICAÇÃO
+                                      </div>
+                                    )}
+                                    {field.maskType === 'clinical_care_page1' && (
+                                      <div className="border border-slate-200 rounded p-2 bg-slate-50 text-[7px] text-slate-500 font-mono">
+                                        <div className="font-bold text-slate-700 mb-1">[Etapa 1 - Acolhimento Farmacêutico]</div>
+                                        Anamnese geral do paciente, hábitos, sintomas, laudos e quadro detalhado de farmacoterapia de 4 linhas.
+                                      </div>
+                                    )}
+                                    {field.maskType === 'clinical_care_page2' && (
+                                      <div className="border border-slate-200 rounded p-2 bg-slate-50 text-[7px] text-slate-500 font-mono">
+                                        <div className="font-bold text-slate-700 mb-1">[Etapa 2 - Rastreamento em Saúde]</div>
+                                        Tabela de parâmetros e sinais vitais (PA, FC, Colesterol, Glicemia Capilar, HbA1c e Peak Flow) com critérios de gravidade.
+                                      </div>
+                                    )}
+                                    {field.maskType === 'clinical_care_page3' && (
+                                      <div className="border border-slate-200 rounded p-2 bg-slate-50 text-[7px] text-slate-500 font-mono">
+                                        <div className="font-bold text-slate-700 mb-1">[Etapas 3 & 4 - Consulta & Auriculoterapia]</div>
+                                        Formulário com 12 pontos de avaliação farmacoterapêutica, plano de cuidado com 13 intervenções e auriculoterapia complementar.
                                       </div>
                                     )}
                                     {field.maskType === 'patient_data' && (
