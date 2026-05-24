@@ -1331,8 +1331,8 @@ export default function Forms() {
                 docPdf.setFont('helvetica', 'normal');
                 docPdf.setFontSize(4.5);
                 docPdf.setTextColor(140, 140, 140);
-                docPdf.text('ºC', cellX + col.width / 4, rowTop + rowH / 2 + 1.2, { align: 'center' });
-                docPdf.text('%', midX + col.width / 4, rowTop + rowH / 2 + 1.2, { align: 'center' });
+                docPdf.text('ºC', midX - 0.7, rowTop + rowH / 2 + 1.2, { align: 'right' });
+                docPdf.text('%', cellX + col.width - 0.7, rowTop + rowH / 2 + 1.2, { align: 'right' });
               } else {
                 docPdf.setFont('helvetica', 'italic');
                 docPdf.setFontSize(5);
@@ -3242,10 +3242,13 @@ export default function Forms() {
                                                 <strong className="text-slate-800 font-bold">{rIdx + 1}</strong>
                                               ) : col.subUnit ? (
                                                 col.subUnit.includes('%') && col.subUnit.includes('º') ? (
-                                                  <div className="flex justify-around text-[4.5px] text-slate-300">
-                                                    <span>_ºC</span>
-                                                    <span className="border-r border-slate-150"></span>
-                                                    <span>_%</span>
+                                                  <div className="flex w-full items-center justify-between text-[4.3px] text-slate-400 font-semibold select-none pr-0.5 leading-none py-0.5">
+                                                    <div className="w-1/2 text-right pr-1 border-r border-slate-150">
+                                                      <span>ºC</span>
+                                                    </div>
+                                                    <div className="w-1/2 text-right pr-1">
+                                                      <span>%</span>
+                                                    </div>
                                                   </div>
                                                 ) : (
                                                   <span className="text-[5.2px] text-slate-400 font-semibold italic">{col.subUnit}</span>
