@@ -16,7 +16,8 @@ import {
   Share2,
   Heart,
   Stethoscope,
-  Pill
+  Pill,
+  Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PWAInstall } from './PWAInstall';
@@ -140,7 +141,18 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             </div>
           </div>
 
-          <div className="pt-6 border-t border-slate-50 shrink-0 space-y-4">
+          <div className="pt-6 border-t border-slate-50 shrink-0 space-y-3">
+            <button
+              onClick={() => {
+                setIsMenuOpen(false);
+                window.dispatchEvent(new CustomEvent('open-pwa-install'));
+              }}
+              className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl transition-all text-xs font-black shadow-lg shadow-blue-600/20 active:scale-95"
+            >
+              <Smartphone size={16} />
+              <span>INSTALAR APLICATIVO</span>
+            </button>
+
             <button
               onClick={() => {
                 setIsMenuOpen(false);
