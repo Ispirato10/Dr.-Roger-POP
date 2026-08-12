@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { getNextSequenceNumber, saveDeclarationAndGetSequence, getRecentDeclarations } from '../services/declarations';
 
@@ -178,37 +178,52 @@ export default function PharmacyServices() {
     }
   };
 
-  const handleSaveAndGeneratePDF = async () => {
-    if (!drugstore?.id) {
-      alert("Por favor, configure sua drogaria primeiro.");
+  const handleJustGeneratePDF = () => {
+    if (Object.values(servicesIncluded).every(v => !v)) {
+      alert("Selecione ao menos um serviço para gerar a declaração.");
       return;
     }
-    
+    try {
+      generatePDF(sequenceNumber);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("Erro ao gerar o arquivo PDF. Verifique os dados preenchidos.");
+    }
+  };
+
+  const handleSaveAndGeneratePDF = async () => {
     if (Object.values(servicesIncluded).every(v => !v)) {
       alert("Selecione ao menos um serviço para gerar a declaração.");
       return;
     }
 
-    try {
-      setIsSaving(true);
-      
-      const payload = {
-        patient,
-        servicesIncluded,
-        glicemia: servicesIncluded.glicemia ? glicemia : null,
-        pressao: servicesIncluded.pressao ? pressao : null,
-        temperatura: servicesIncluded.temperatura ? temperatura : null,
-        injetaveis: servicesIncluded.injetaveis ? injetaveis : null,
-      };
+    setIsSaving(true);
+    let activeSeq = sequenceNumber;
+    const drugstoreId = drugstore?.id || user?.uid;
 
-      const seq = await saveDeclarationAndGetSequence(drugstore.id, payload, sequenceNumber);
-      generatePDF(seq);
-      setSequenceNumber(seq + 1);
-      
-    } catch (error) {
-      console.error("Error saving declaration:", error);
-      alert("Erro ao salvar declaração. O PDF será gerado sem numeração.");
-      generatePDF(sequenceNumber);
+    if (drugstoreId) {
+      try {
+        const payload = {
+          patient,
+          servicesIncluded,
+          glicemia: servicesIncluded.glicemia ? glicemia : null,
+          pressao: servicesIncluded.pressao ? pressao : null,
+          temperatura: servicesIncluded.temperatura ? temperatura : null,
+          injetaveis: servicesIncluded.injetaveis ? injetaveis : null,
+        };
+
+        activeSeq = await saveDeclarationAndGetSequence(drugstoreId, payload, sequenceNumber);
+        setSequenceNumber(activeSeq + 1);
+      } catch (error) {
+        console.error("Error saving declaration to Firestore:", error);
+      }
+    }
+
+    try {
+      generatePDF(activeSeq);
+    } catch (pdfError) {
+      console.error("Error generating PDF:", pdfError);
+      alert("Erro ao gerar o arquivo PDF. Verifique os dados inseridos.");
     } finally {
       setIsSaving(false);
     }
@@ -328,7 +343,7 @@ export default function PharmacyServices() {
       refY += 4;
 
       // Table box
-      (doc as any).autoTable({
+      autoTable(doc, {
         startY: refY,
         margin: { left: col2X },
         tableWidth: colWidth,
@@ -342,7 +357,7 @@ export default function PharmacyServices() {
         ]
       });
 
-      refY = (doc as any).lastAutoTable.finalY + 3;
+      refY = ((doc as any).lastAutoTable?.finalY || refY + 20) + 3;
       doc.setFontSize(6);
       doc.setFont('helvetica', 'italic');
       doc.text('* O jejum é definido como a falta de ingestão calórica por no mínimo 8 horas.', col2X, refY);
@@ -390,7 +405,7 @@ export default function PharmacyServices() {
       doc.text('Valores de Referência (V Diretrizes Brasileiras - SBC/SBH/SBN):', col2X, refPY);
       refPY += 4;
 
-      (doc as any).autoTable({
+      autoTable(doc, {
         startY: refPY,
         margin: { left: col2X },
         tableWidth: colWidth,
@@ -408,7 +423,7 @@ export default function PharmacyServices() {
         ]
       });
 
-      refPY = (doc as any).lastAutoTable.finalY + 3;
+      refPY = ((doc as any).lastAutoTable?.finalY || refPY + 25) + 3;
 
       y = Math.max(startPressY + (splitOrientP.length * 4) + 20, refPY + 5);
       doc.setLineWidth(0.2);
@@ -448,7 +463,7 @@ export default function PharmacyServices() {
       doc.text('Valores de Referência de Temperatura Corporal:', col2X, refTY);
       refTY += 4;
 
-      (doc as any).autoTable({
+      autoTable(doc, {
         startY: refTY,
         margin: { left: col2X },
         tableWidth: colWidth,
@@ -463,7 +478,7 @@ export default function PharmacyServices() {
         ]
       });
 
-      refTY = (doc as any).lastAutoTable.finalY + 3;
+      refTY = ((doc as any).lastAutoTable?.finalY || refTY + 20) + 3;
 
       y = Math.max(startTempY + (splitOrientT.length * 4) + 15, refTY + 5);
       doc.setLineWidth(0.2);
@@ -550,7 +565,21 @@ Nesse sentido, tenho ciência de que, quando da aplicação da medicação injet
       doc.text(`Emitido em: ${dataHora}`, pageWidth/2, 150, { align: 'center' });
     }
 
-    doc.save(`declaracao_servicos_${activeSeq}_${patient.nome || 'paciente'}.pdf`);
+    const pdfFileName = `declaracao_servicos_${activeSeq}_${(patient.nome || 'paciente').replace(/[^a-zA-Z0-9_\-]/g, '_')}.pdf`;
+    try {
+      doc.save(pdfFileName);
+    } catch (saveError) {
+      console.warn("Standard doc.save failed, triggering blob fallback download:", saveError);
+      const blob = doc.output('blob');
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = pdfFileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    }
   };
 
   const filteredHistory = recentDeclarations.filter(item => {
@@ -590,7 +619,7 @@ Nesse sentido, tenho ciência de que, quando da aplicação da medicação injet
           </button>
 
           <button
-            onClick={() => generatePDF()}
+            onClick={handleJustGeneratePDF}
             className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 hover:text-slate-900 rounded-xl font-bold transition-all shadow-sm active:scale-95 text-sm"
             disabled={isSaving}
           >
