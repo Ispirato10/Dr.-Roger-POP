@@ -57,6 +57,16 @@ service cloud.firestore {
     match /revisions/{revisionId} {
       allow read, write: if isSignedIn();
     }
+    
+    // Counters
+    match /counters/{counterId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Declarations
+    match /declarations/{declarationId} {
+      allow read, write: if isSignedIn();
+    }
 
     // Default deny at the bottom
     match /{document=**} {

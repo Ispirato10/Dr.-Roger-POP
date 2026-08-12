@@ -13,6 +13,8 @@ import Forms from './pages/Forms';
 import Anamnese from './pages/Anamnese';
 import Prescription from './pages/Prescription';
 import Donation from './pages/Donation';
+import PharmacyServices from './pages/PharmacyServices';
+import SettingsPage from './pages/Settings';
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
@@ -65,6 +67,14 @@ export default function App() {
               </AuthGuard>
             } />
 
+            <Route path="/services" element={
+              <AuthGuard>
+                <RegistrationGuard>
+                  <PharmacyServices />
+                </RegistrationGuard>
+              </AuthGuard>
+            } />
+
             <Route path="/support" element={
               <AuthGuard>
                 <RegistrationGuard>
@@ -92,6 +102,14 @@ export default function App() {
             <Route path="/profile" element={
               <AuthGuard>
                 <DrugstoreProfile />
+              </AuthGuard>
+            } />
+
+            <Route path="/settings" element={
+              <AuthGuard>
+                <RegistrationGuard>
+                  <SettingsPage />
+                </RegistrationGuard>
               </AuthGuard>
             } />
 

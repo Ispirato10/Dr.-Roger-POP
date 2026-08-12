@@ -110,6 +110,33 @@
         "changeDate": { "type": "string", "format": "date-time" },
         "reason": { "type": "string" }
       }
+    },
+    "Counter": {
+      "title": "Sequence Counters",
+      "description": "Global counters for sequential numbers",
+      "type": "object",
+      "properties": {
+        "value": { "type": "number" }
+      },
+      "required": ["value"]
+    },
+    "Declaration": {
+      "title": "Pharmacy Service Declaration",
+      "description": "Declarações de Serviços Farmacêuticos",
+      "type": "object",
+      "properties": {
+        "sequenceNumber": { "type": "number" },
+        "patient": { "type": "object" },
+        "servicesIncluded": { "type": "object" },
+        "glicemia": { "type": "object" },
+        "pressao": { "type": "object" },
+        "temperatura": { "type": "object" },
+        "injetaveis": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "drugstoreId": { "type": "string" },
+        "authorId": { "type": "string" }
+      },
+      "required": ["sequenceNumber", "patient", "drugstoreId", "authorId", "createdAt"]
     }
   },
   "firestore": {
@@ -140,6 +167,14 @@
     "/customForms/{formId}": {
       "schema": "CustomForm",
       "description": "Coleção de formulários personalizados"
+    },
+    "/counters/{counterId}": {
+      "schema": "Counter",
+      "description": "Contadores globais"
+    },
+    "/declarations/{declarationId}": {
+      "schema": "Declaration",
+      "description": "Coleção de declarações"
     }
   }
 }

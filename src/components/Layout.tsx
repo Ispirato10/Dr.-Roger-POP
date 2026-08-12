@@ -45,12 +45,14 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+    { name: 'Declarações', path: '/services', icon: FileText },
     { name: 'Anamnese', path: '/anamnesis', icon: Stethoscope },
     { name: 'Receituário', path: '/prescription', icon: Pill },
     { name: 'Meus POPs', path: '/pops', icon: FileText },
     { name: 'Formulários', path: '/forms', icon: ClipboardCheck },
     { name: 'Novo POP', path: '/pops/new', icon: PlusCircle },
     { name: 'Dados da Drogaria', path: '/profile', icon: Building2 },
+    { name: 'Configurações', path: '/settings', icon: Settings },
     { name: 'Apoiar Projeto', path: '/support', icon: Heart },
   ];
 
