@@ -5,8 +5,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '../contexts/AuthContext';
 import { doc, setDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import { Building2, Save, Loader2 } from 'lucide-react';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { Building2, Save, Loader2, Sparkles } from 'lucide-react';
+import { optimizeImage } from '../lib/imageOptimizer';
+import { saveLocalDrugstore, reportQuotaExceeded, isQuotaExceededError } from '../lib/storageSync';
 
 const drugstoreSchema = z.object({
   name: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
@@ -37,75 +39,35 @@ export default function DrugstoreProfile() {
     }
   });
 
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setLogoError(null);
       setLogoSuccessInfo(null);
 
-      // 1. Initial size check to prevent memory issues with massive images
-      if (file.size > 12 * 1024 * 1024) { // 12MB limit
-        setLogoError("Imagem muito grande! O limite do arquivo original é 12MB. Escolha uma imagem menor para que possamos otimizá-la para o tamanho ideal.");
+      // 1. Initial size check
+      if (file.size > 15 * 1024 * 1024) { // 15MB limit
+        setLogoError("Imagem muito grande! Escolha um arquivo original de até 15MB.");
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          // 2. We use HTML5 Canvas to resize and compress the image to target size
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
+      try {
+        // Optimize using canvas with ultra-compact payload (350x140 max, target < 60KB)
+        const result = await optimizeImage(file, {
+          maxWidth: 350,
+          maxHeight: 140,
+          quality: 0.85,
+          format: 'image/jpeg',
+          maxSizeKb: 80
+        });
 
-          // Ideal print size boundary (usually max width 350px or height 140px is perfect for the PDF header)
-          const MAX_WIDTH = 350;
-          const MAX_HEIGHT = 140;
-
-          if (width > MAX_WIDTH || height > MAX_HEIGHT) {
-            const widthRatio = MAX_WIDTH / width;
-            const heightRatio = MAX_HEIGHT / height;
-            const bestRatio = Math.min(widthRatio, heightRatio);
-            width = Math.round(width * bestRatio);
-            height = Math.round(height * bestRatio);
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            // Draw original image resized into the canvas
-            ctx.drawImage(img, 0, 0, width, height);
-
-            // Compress to a highly efficient JPEG at 85% build-quality
-            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
-            
-            // Validate the compressed size. Firestore needs it extremely light to avoid 1MB document limitations
-            const base64Length = compressedBase64.length;
-            const sizeInKb = Math.round(base64Length * 0.75 / 1024);
-
-            if (sizeInKb > 150) { 
-              setLogoError(`Não foi possível otimizar a imagem o suficiente. Tamanho final de ${sizeInKb}KB excedeu o máximo de 150KB permitido para armazenamento seguro de cabeçalhos. Recomendamos usar arquivos menores ou formatos já comprimidos.`);
-              return;
-            }
-
-            setLogoPreview(compressedBase64);
-            setValue('logoUrl', compressedBase64);
-            setLogoSuccessInfo(`Imagem otimizada com sucesso! Redimensionada automaticamente de ${img.width}x${img.height}px para ${width}x${height}px (${sizeInKb}KB).`);
-          } else {
-            setLogoError("Não foi possível acessar o contexto de compressão de imagem do seu navegador.");
-          }
-        };
-        img.onerror = () => {
-          setLogoError("Erro ao carregar a imagem. Certifique-se de que o arquivo não está corrompido e é no formato regular PNG, JPG ou WEBP.");
-        };
-        img.src = event.target?.result as string;
-      };
-      reader.onerror = () => {
-        setLogoError("Falha na leitura do arquivo de imagem.");
-      };
-      reader.readAsDataURL(file);
+        setLogoPreview(result.base64);
+        setValue('logoUrl', result.base64);
+        setLogoSuccessInfo(`Logo otimizado com sucesso! Reduzido em ${result.reductionPercentage}% para apenas ${result.optimizedSizeKb}KB (${result.width}x${result.height}px).`);
+      } catch (err: any) {
+        console.error("Logo optimization error:", err);
+        setLogoError(err?.message || "Erro ao otimizar e comprimir o logotipo.");
+      }
     }
   };
 
@@ -114,23 +76,47 @@ export default function DrugstoreProfile() {
     if (logoError) return;
     setSaving(true);
     setSuccess(false);
+
+    const payload = {
+      ...values,
+      ownerId: user.uid,
+      id: user.uid,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // 1. Save locally first so user NEVER loses their data!
+    saveLocalDrugstore(payload);
+
     try {
-      await setDoc(doc(db, 'drugstores', user.uid), {
-        ...values,
-        ownerId: user.uid,
-        updatedAt: new Date().toISOString(),
-      }, { merge: true });
-      
+      // 2. Persist to Firestore
+      await setDoc(doc(db, 'drugstores', user.uid), payload, { merge: true });
       await refreshDrugstore();
       setSuccess(true);
       
-      // Pequeno delay para o usuário ver a mensagem de sucesso antes de redirecionar
       setTimeout(() => {
         setSuccess(false);
         navigate('/');
       }, 1500);
-    } catch (error) {
-      console.error("Error saving drugstore:", error);
+    } catch (error: any) {
+      console.error("Error saving drugstore to cloud:", error);
+      if (isQuotaExceededError(error)) {
+        reportQuotaExceeded(error, 'saveDrugstore');
+        // Still treat as local success!
+        await refreshDrugstore();
+        setSuccess(true);
+        setTimeout(() => {
+          setSuccess(false);
+          navigate('/');
+        }, 2000);
+      } else {
+        handleFirestoreError(error, OperationType.WRITE, `drugstores/${user.uid}`);
+        await refreshDrugstore();
+        setSuccess(true);
+        setTimeout(() => {
+          setSuccess(false);
+          navigate('/');
+        }, 1500);
+      }
     } finally {
       setSaving(false);
     }

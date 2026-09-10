@@ -2,6 +2,13 @@ import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { collection, query, where, getDocs, onSnapshot, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { 
+  getLocalPops, 
+  saveLocalPop, 
+  deleteLocalPop, 
+  isQuotaExceededError, 
+  reportQuotaExceeded 
+} from '../lib/storageSync';
 import { Link, useSearchParams } from 'react-router-dom';
 import { 
   FileText, 
@@ -24,8 +31,9 @@ export default function PopList() {
   const [searchParams] = useSearchParams();
   const queryParam = searchParams.get('q');
   
-  const [pops, setPops] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  // Start with locally cached POPs immediately to prevent blank loading screen
+  const [pops, setPops] = React.useState<any[]>(() => getLocalPops(drugstore?.id));
+  const [loading, setLoading] = React.useState(!getLocalPops(drugstore?.id).length);
   const [searchTerm, setSearchTerm] = React.useState(queryParam || '');
   const [filterStatus, setFilterStatus] = React.useState('all');
 
@@ -39,16 +47,32 @@ export default function PopList() {
   React.useEffect(() => {
     if (!drugstore) return;
     
-    setLoading(true);
+    // Initial local read
+    const local = getLocalPops(drugstore.id);
+    if (local.length > 0) {
+      setPops(local);
+      setLoading(false);
+    }
+    
     const q = query(collection(db, 'pops'), where('drugstoreId', '==', drugstore.id));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      const docs = snapshot.docs.map(d => {
+        const item = { id: d.id, ...d.data() };
+        saveLocalPop(item); // Update local cache seamlessly
+        return item;
+      });
       setPops(docs);
       setLoading(false);
     }, (error) => {
-      console.error("Pops list snapshot error:", error);
+      console.warn("Pops list snapshot error (using local cache):", error);
+      if (isQuotaExceededError(error)) {
+        reportQuotaExceeded(error, 'listPops');
+      }
       handleFirestoreError(error, OperationType.LIST, 'pops');
+      // Fallback to local storage
+      const fallbackList = getLocalPops(drugstore.id);
+      setPops(fallbackList);
       setLoading(false);
     });
 
@@ -70,12 +94,21 @@ export default function PopList() {
     setConfirmDelete(null);
     setIsDeleting(id);
 
+    // Delete locally first
+    deleteLocalPop(id);
+    setPops(prev => prev.filter(p => p.id !== id));
+
     try {
-      await deleteDoc(doc(db, 'pops', id));
+      if (!id.startsWith('pop_') && !id.startsWith('local_')) {
+        await deleteDoc(doc(db, 'pops', id));
+      }
     } catch (error: any) {
-      console.error("Error deleting:", error);
-      alert(`Erro ao excluir: ${error.message || 'Sem permissão'}`);
-      handleFirestoreError(error, OperationType.DELETE, `pops/${id}`);
+      console.error("Error deleting from cloud:", error);
+      if (isQuotaExceededError(error)) {
+        reportQuotaExceeded(error, `deletePop:${id}`);
+      } else {
+        handleFirestoreError(error, OperationType.DELETE, `pops/${id}`);
+      }
     } finally {
       setIsDeleting(null);
     }

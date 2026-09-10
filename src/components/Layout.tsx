@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PWAInstall } from './PWAInstall';
+import { QuotaNotificationBanner } from './QuotaNotificationBanner';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, drugstore } = useAuth();
@@ -94,6 +95,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </div>
         </div>
       </header>
+      <QuotaNotificationBanner />
 
       <div className="flex flex-1 overflow-hidden relative">
         {/* Sidebar */}

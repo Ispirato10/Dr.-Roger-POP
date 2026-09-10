@@ -43,6 +43,15 @@ import { format } from 'date-fns';
 import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, ImageRun, Table, TableRow, TableCell, WidthType, BorderStyle, VerticalAlign } from 'docx';
 import { useFieldArray } from 'react-hook-form';
 import { saveAs } from 'file-saver';
+import { optimizeImage } from '../lib/imageOptimizer';
+import { 
+  saveLocalPop, 
+  getLocalPopById, 
+  deleteLocalPop, 
+  reportQuotaExceeded, 
+  isQuotaExceededError,
+  addToPendingSyncQueue 
+} from '../lib/storageSync';
 import PopVisualizer from '../components/PopVisualizer';
 import { generatePopPDF } from '../lib/pdfGenerator';
 
@@ -343,18 +352,27 @@ export default function PopEditor() {
     setValue('customFields', fields);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert("A imagem deve ter no máximo 2MB");
+      if (file.size > 15 * 1024 * 1024) {
+        alert("A imagem selecionada é muito grande! Escolha um arquivo de até 15MB.");
         return;
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        appendImage({ url: reader.result as string, caption: '' });
-      };
-      reader.readAsDataURL(file);
+      try {
+        // Automatically optimize image (downscale to max 800x600, target 60-90KB)
+        const result = await optimizeImage(file, {
+          maxWidth: 800,
+          maxHeight: 600,
+          quality: 0.8,
+          format: 'image/jpeg',
+          maxSizeKb: 90
+        });
+        appendImage({ url: result.base64, caption: '' });
+      } catch (err: any) {
+        console.error("Image optimization error:", err);
+        alert("Erro ao processar imagem: " + (err?.message || "Tente outro arquivo."));
+      }
     }
   };
 
@@ -668,18 +686,33 @@ export default function PopEditor() {
         };
 
         reset(resetData);
-        // Force manual check for title after reset
+        // Also save to local cache for instant access
+        saveLocalPop({ id, ...resetData, drugstoreId: drugstore?.id });
         if (!resetData.title) console.warn("Attention: POP title is empty in the database document!");
       } else {
-        console.error("POP document not found in Firestore:", id);
-        alert("Documento não encontrado. Ele pode ter sido excluído.");
-        navigate('/pops');
+        // Fallback to local storage
+        const localPop = getLocalPopById(id);
+        if (localPop) {
+          reset(localPop);
+        } else {
+          console.error("POP document not found in Firestore or Local:", id);
+          alert("Documento não encontrado.");
+          navigate('/pops');
+        }
       }
     } catch (error) {
       console.error("Error fetching POP:", error);
-      handleFirestoreError(error, OperationType.GET, `pops/${id}`);
+      if (isQuotaExceededError(error)) {
+        reportQuotaExceeded(error, `fetchPop:${id}`);
+      }
+      // Check local cache
+      const localPop = getLocalPopById(id);
+      if (localPop) {
+        reset(localPop);
+      } else {
+        handleFirestoreError(error, OperationType.GET, `pops/${id}`);
+      }
     } finally {
-      // Small delay to ensure React Hook Form has applied the changes
       setTimeout(() => setLoading(false), 100);
     }
   };
@@ -722,40 +755,62 @@ export default function PopEditor() {
   const onSubmit = async (values: PopFormValues) => {
     if (!drugstore || !user) return;
     setSaving(true);
+    const now = new Date().toISOString();
+    
+    // Sanitize tables to avoid Firestore nested arrays error: string[][] -> { cells: string[] }[]
+    const safeTables = (values.tables || []).map(table => ({
+      ...table,
+      rows: (table.rows || []).map((row: any) => {
+        if (Array.isArray(row)) {
+          return { cells: row };
+        }
+        return row;
+      })
+    }));
+
+    const targetId = id || `pop_${Date.now()}`;
+    const popData = {
+      ...values,
+      id: targetId,
+      tables: safeTables,
+      drugstoreId: drugstore.id,
+      ownerId: drugstore.id,
+      authorId: user.uid,
+      updatedAt: now,
+    };
+
+    // 1. Save locally FIRST to guarantee 0 data loss
+    saveLocalPop(popData);
+
     try {
-      const now = new Date().toISOString();
-      
-      // Sanitize tables to avoid Firestore nested arrays error: string[][] -> { cells: string[] }[]
-      const safeTables = (values.tables || []).map(table => ({
-        ...table,
-        rows: (table.rows || []).map((row: any) => {
-          if (Array.isArray(row)) {
-            return { cells: row };
-          }
-          return row;
-        })
-      }));
-
-      const popData = {
-        ...values,
-        tables: safeTables,
-        drugstoreId: drugstore.id,
-        ownerId: drugstore.id,
-        authorId: user.uid,
-        updatedAt: now,
-      };
-
-      if (id) {
+      if (id && !id.startsWith('pop_')) {
         await updateDoc(doc(db, 'pops', id), popData);
       } else {
         const newDocRef = await addDoc(collection(db, 'pops'), {
           ...popData,
           createdAt: now,
         });
-        navigate(`/pops/edit/${newDocRef.id}`);
+        saveLocalPop({ ...popData, id: newDocRef.id });
+        if (!id) {
+          navigate(`/pops/edit/${newDocRef.id}`);
+        }
       }
     } catch (error: any) {
-      handleFirestoreError(error, OperationType.WRITE, id ? `pops/${id}` : 'pops');
+      console.warn("Cloud write failed, stored in local persistence:", error);
+      if (isQuotaExceededError(error)) {
+        reportQuotaExceeded(error, 'savePop');
+        addToPendingSyncQueue({
+          collectionName: 'pops',
+          docId: targetId,
+          action: id ? 'update' : 'add',
+          data: popData
+        });
+        if (!id) {
+          navigate(`/pops/edit/${targetId}`);
+        }
+      } else {
+        handleFirestoreError(error, OperationType.WRITE, id ? `pops/${id}` : 'pops');
+      }
     } finally {
       setSaving(false);
     }
@@ -774,13 +829,29 @@ export default function PopEditor() {
 
     setDeleting(true);
     setConfirmDelete(false);
+    
+    // Delete from local cache
+    deleteLocalPop(id);
+
     try {
-      await deleteDoc(doc(db, 'pops', id));
+      if (!id.startsWith('pop_')) {
+        await deleteDoc(doc(db, 'pops', id));
+      }
       navigate('/pops');
     } catch (error: any) {
-      console.error("Error deleting:", error);
-      alert(`Erro ao excluir: ${error.message || 'Sem permissão'}`);
-      handleFirestoreError(error, OperationType.DELETE, `pops/${id}`);
+      console.error("Error deleting from cloud:", error);
+      if (isQuotaExceededError(error)) {
+        reportQuotaExceeded(error, `deletePop:${id}`);
+        addToPendingSyncQueue({
+          collectionName: 'pops',
+          docId: id,
+          action: 'delete'
+        });
+        navigate('/pops');
+      } else {
+        handleFirestoreError(error, OperationType.DELETE, `pops/${id}`);
+        navigate('/pops');
+      }
     } finally {
       setDeleting(false);
     }

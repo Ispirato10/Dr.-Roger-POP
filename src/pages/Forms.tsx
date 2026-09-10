@@ -3,6 +3,14 @@ import { jsPDF } from 'jspdf';
 import { useAuth } from '../contexts/AuthContext';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
+  saveLocalCustomForm, 
+  getLocalCustomForms, 
+  deleteLocalCustomForm, 
+  isQuotaExceededError, 
+  reportQuotaExceeded,
+  addToPendingSyncQueue
+} from '../lib/storageSync';
+import { 
   collection, 
   query, 
   where, 
@@ -305,24 +313,40 @@ export default function Forms() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busySaving, setBusySaving] = useState<boolean>(false);
 
-  // Load custom creations from Firebase
+  // Load custom creations from Firebase and LocalStorage
   const fetchCustomForms = async () => {
     if (!user) return;
-    setLoadingForms(true);
+    
+    // 1. Instant load from local cache
+    const local = getLocalCustomForms(user.uid);
+    if (local && local.length > 0) {
+      setCustomForms(local);
+      setLoadingForms(false);
+    } else {
+      setLoadingForms(true);
+    }
+
     const path = 'customForms';
     try {
       const q = query(collection(db, path), where('drugstoreId', '==', user.uid));
       const querySnapshot = await getDocs(q);
       const list: CustomForm[] = [];
       querySnapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() } as CustomForm);
+        const item = { id: doc.id, ...doc.data() } as CustomForm;
+        list.push(item);
+        saveLocalCustomForm(item); // Cache locally
       });
       setCustomForms(list);
     } catch (error) {
-      console.error("Erro ao carregar formulários:", error);
+      console.warn("Using local custom forms fallback:", error);
+      if (isQuotaExceededError(error)) {
+        reportQuotaExceeded(error, 'fetchCustomForms');
+      }
       try {
         handleFirestoreError(error, OperationType.GET, path);
       } catch (e) {}
+      // Ensure local forms are still set
+      setCustomForms(getLocalCustomForms(user.uid));
     } finally {
       setLoadingForms(false);
     }
@@ -555,12 +579,25 @@ export default function Forms() {
   const handleDeleteCustomForm = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!window.confirm("Você tem certeza que deseja excluir permanentemente este formulário impresso?")) return;
+    
+    // 1. Delete from local cache
+    deleteLocalCustomForm(id);
+    setCustomForms(prev => prev.filter(f => f.id !== id));
+
     try {
-      await deleteDoc(doc(db, 'customForms', id));
-      setCustomForms(prev => prev.filter(f => f.id !== id));
+      if (!id.startsWith('form_') && !id.startsWith('local_')) {
+        await deleteDoc(doc(db, 'customForms', id));
+      }
     } catch (err) {
-      console.error(err);
-      alert("Erro ao excluir. Verifique as credenciais no Firebase.");
+      console.warn("Error deleting custom form from cloud:", err);
+      if (isQuotaExceededError(err)) {
+        reportQuotaExceeded(err, `deleteCustomForm:${id}`);
+        addToPendingSyncQueue({
+          collectionName: 'customForms',
+          docId: id,
+          action: 'delete'
+        });
+      }
     }
   };
 
@@ -575,7 +612,9 @@ export default function Forms() {
       label: f.label.trim() || 'Campo Sem Título'
     }));
 
-    const payload: Omit<CustomForm, 'id'> = {
+    const targetId = editingId || `form_${Date.now()}`;
+    const payload: CustomForm = {
+      id: targetId,
       title: formTitle.trim(),
       code: formCode.trim().toUpperCase(),
       version: Number(formVersion) || 1,
@@ -598,18 +637,36 @@ export default function Forms() {
       gridRowsCount: Number(gridRowsCount) || 31
     };
 
+    // 1. Save locally FIRST
+    saveLocalCustomForm(payload);
+
     try {
-      if (editingId) {
-        await updateDoc(doc(db, 'customForms', editingId), payload);
+      if (editingId && !editingId.startsWith('form_') && !editingId.startsWith('local_')) {
+        const { id, ...dataToSave } = payload;
+        await updateDoc(doc(db, 'customForms', editingId), dataToSave);
       } else {
-        await addDoc(collection(db, 'customForms'), payload);
+        const { id, ...dataToSave } = payload;
+        const newDoc = await addDoc(collection(db, 'customForms'), dataToSave);
+        saveLocalCustomForm({ ...payload, id: newDoc.id });
       }
       await fetchCustomForms();
       setIsEditorOpen(false);
       setActiveTab('custom');
-    } catch (err) {
-      console.error(err);
-      alert("Erro ao gravar estrutura no Firestore.");
+    } catch (err: any) {
+      console.warn("Cloud write failed for custom form, persisted locally:", err);
+      if (isQuotaExceededError(err)) {
+        reportQuotaExceeded(err, 'saveCustomForm');
+        addToPendingSyncQueue({
+          collectionName: 'customForms',
+          docId: targetId,
+          action: editingId ? 'update' : 'add',
+          data: payload
+        });
+      }
+      // Still refresh local list and close modal cleanly
+      setCustomForms(getLocalCustomForms(user.uid));
+      setIsEditorOpen(false);
+      setActiveTab('custom');
     } finally {
       setBusySaving(false);
     }
